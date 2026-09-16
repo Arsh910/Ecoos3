@@ -6,6 +6,7 @@ import (
 	"server/internal/env"
 	"server/internal/room"
 	"strings"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
@@ -33,6 +34,7 @@ func main() {
 			",",
 		),
 	}
+	app.rm.StartSweeper(10 * time.Minute)
 
 	if err := app.serve(); err != nil {
 		log.Fatal(err)

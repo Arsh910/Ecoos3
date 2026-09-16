@@ -46,7 +46,16 @@ export function useWebRTC() {
   const pendingAcceptRef = useRef({});   // "peerId:fileId" -> resolve fn
   const sendingRef = useRef({});         // "peerId:fileId" -> { file, meta }
   const peerMetaRef = useRef({});        // peerId -> { alias }
+  const connectRef = useRef(null);
 
+  const sessionRef = useRef({ code: null, alias: null, intentional: false, attempts: 0, timer: null });
+
+  const hasActiveTransfer = useCallback(() => {
+    const receiving = Object.values(incommingRef.current)
+      .some((files) => Object.values(files).some((s) => !s.finalizing));
+    const sending = Object.keys(sendingRef.current).length > 0;
+    return receiving || sending;
+  }, []);
 
   const log = useCallback((msg) => {
     setLogs((prev) => [...prev, msg]);
@@ -120,10 +129,16 @@ export function useWebRTC() {
     if (state.receivedCount < state.meta.totalChunks) return;
 
     if (state.finalizing) return;
-    state.finalizing = true;
     updateTransfer(peerId, fileId, { finalizing: true })
     
     if (state.confirmTimer) { clearInterval(state.confirmTimer); state.confirmTimer = null; }
+
+    state.finalizing = true;
+    if (!hasActiveTransfer() && wsRef.current?.readyState === WebSocket.OPEN) {
+      log('transfers done — closing signaling');
+      sessionRef.current.intentional = true;
+      wsRef.current.close();
+    }
 
     try { await state.writable.close(); } 
     catch (e) {
@@ -349,6 +364,12 @@ export function useWebRTC() {
     if (msg.type === 'file-verified') {
       updateTransfer(peerId, msg.fileId, { done: true, finalizing:false });
       delete sendingRef.current[tkey(peerId, msg.fileId)];
+      
+      if (!hasActiveTransfer() && wsRef.current?.readyState === WebSocket.OPEN) {
+        log('transfers done — closing signaling');
+        sessionRef.current.intentional = true;
+        wsRef.current.close();
+      }
       patchTransfer(msg.fileId, peerId, { status: 'complete' }).catch(() => { });
       log(`peer confirmed: ${msg.fileId}`);
       return;
@@ -623,6 +644,10 @@ export function useWebRTC() {
   }, [log, handleControlMessage, handleFileChunck, announceResumable, reportConnectionType]);
 
   const connectToRoom = useCallback((code, alias) => {
+    sessionRef.current.code = code;
+    sessionRef.current.alias = alias;
+    sessionRef.current.intentional = false;
+
     setRoomCode(code);
 
     const myId = getPeerId();
@@ -636,6 +661,7 @@ export function useWebRTC() {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      sessionRef.current.attempts = 0;
       setSignaling('open');
       log('signaling connected');
     };
@@ -643,6 +669,21 @@ export function useWebRTC() {
     ws.onclose = () => {
       setSignaling('closed');
       log('signaling closed');
+
+      if(sessionRef.current.intentional) return;
+      if(!hasActiveTransfer()){
+        log('no active transfers - staying disconnected');
+        return;
+      }
+
+      const attempts = sessionRef.current.attempts + 1;
+      sessionRef.current.attempts = attempts;
+      const delay = Math.min(1000 * 2 **(attempts - 1), 30000);
+      log(`reconnecting in ${Math.round(delay/1000)}s (attemps ${attempts})`);
+      sessionRef.current.timer = setTimeout(()=>{
+        connectRef.current?.(sessionRef.current.code , sessionRef.current.alias);
+      }, delay);
+
     };
 
     ws.onerror = () => {
@@ -664,12 +705,23 @@ export function useWebRTC() {
           selfIdRef.current = msg.self;
           setSelfId(msg.self);
         }
+
         setPeers(msg.peers.map((p) => ({ id: p.id, alias: p.alias, state: 'new' })));
 
         msg.peers.forEach((p) => {
           peerMetaRef.current[p.id] = { alias: p.alias };
-          peersRef.current[p.id]?.pc.close();
-          delete peersRef.current[p.id];
+          
+          const existing = peersRef.current[p.id];
+          if (existing && existing.pc.connectionState === 'connected') {
+            log(`${nameOf(peerMetaRef, p.id)} rejoined signaling; keeping live connection`);
+            return;
+          }
+
+          if (existing) {
+            existing.pc.close();
+            delete peersRef.current[p.id];
+            log(`peer reconnected : ${nameOf(peerMetaRef, p.id)}`);
+          }
           createPeerConnection(p.id, shouldOffer(selfIdRef.current, p.id));
         });
         return;
@@ -678,11 +730,19 @@ export function useWebRTC() {
       if (msg.type === 'peer-joined') {
 
         if (msg.peerId === selfIdRef.current) return;
-
         peerMetaRef.current[msg.peerId] = { alias: msg.alias };
-        const stale = peersRef.current[msg.peerId];
-        if (stale) {
-          stale.pc.close();
+
+        const existing = peersRef.current[msg.peerId];
+
+        if (existing && existing.pc.connectionState === 'connected') {
+          log(`${nameOf(peerMetaRef, msg.peerId)} rejoined signaling; keeping live connection`);
+          setPeers((prev) => prev.map((p) =>
+            p.id === msg.peerId ? { ...p, alias: msg.alias } : p));
+          return;
+        }
+
+        if (existing) {
+          existing.pc.close();
           delete peersRef.current[msg.peerId];
           log(`peer reconnected : ${nameOf(peerMetaRef, msg.peerId)}`);
         } else {
@@ -747,6 +807,8 @@ export function useWebRTC() {
 
   }, [log, createPeerConnection, updateTransfer]);
 
+  connectRef.current = connectToRoom;
+
   const createRoom = useCallback(async (alias) => {
     const res = await fetch(`${BASE_API_URL}/room/create`, { method: 'POST' });
     if (!res.ok) throw new Error(`room create failed: ${res.status}`);
@@ -771,6 +833,8 @@ export function useWebRTC() {
 
     wsRef.current?.close();
     wsRef.current = null;
+    sessionRef.current.intentional = true;
+    clearTimeout(sessionRef.current.timer);
 
     if (persist) {
       Object.entries(incommingRef.current).forEach(([peerId, files]) => {

@@ -30,9 +30,10 @@ type Peer struct {
 }
 
 type Room struct {
-	Code  string
-	peers map[string]*Peer
-	mu    sync.Mutex
+	Code    string
+	peers   map[string]*Peer
+	emptyAt time.Time
+	mu      sync.Mutex
 }
 
 type RoomManger struct {
@@ -124,13 +125,31 @@ func (rm *RoomManger) RemoveRoomIfEmpty(code string) {
 	}
 
 	room.mu.Lock()
-	empty := len(room.peers) == 0
-	room.mu.Unlock()
-
-	if empty {
-		delete(rm.rooms, code)
-		log.Println("room removed: ", code)
+	if len(room.peers) == 0 && room.emptyAt.IsZero() {
+		room.emptyAt = time.Now()
+		log.Println("room removed, grace period started: ", code)
 	}
+	room.mu.Unlock()
+}
+
+func (rm *RoomManger) StartSweeper(ttl time.Duration) {
+	go func() {
+		for range time.Tick(time.Minute) {
+			rm.mu.Lock()
+			for code, room := range rm.rooms {
+				room.mu.Lock()
+				expired := len(room.peers) == 0 &&
+					!room.emptyAt.IsZero() &&
+					time.Since(room.emptyAt) > ttl
+				room.mu.Unlock()
+				if expired {
+					delete(rm.rooms, code)
+					log.Println("room expired:", code)
+				}
+			}
+			rm.mu.Unlock()
+		}
+	}()
 }
 
 func (r *Room) JoinRoom(peer *Peer) error {
@@ -155,6 +174,7 @@ func (r *Room) JoinRoom(peer *Peer) error {
 	}
 
 	r.peers[peer.ID] = peer
+	r.emptyAt = time.Time{}
 	r.mu.Unlock()
 
 	if isReconnect && old.Conn != peer.Conn {
