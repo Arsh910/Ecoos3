@@ -17,9 +17,7 @@ func (app *application) HandleCreateRoom(c *gin.Context) {
 		Code string `json:"code"`
 	}
 
-	if err := c.BindJSON(&body); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-	}
+	c.ShouldBindJSON(&body)
 
 	code := strings.ToUpper(strings.TrimSpace(body.Code))
 	if code == "" {
