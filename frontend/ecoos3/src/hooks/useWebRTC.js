@@ -48,15 +48,6 @@ export function useWebRTC() {
   const peerMetaRef = useRef({});        // peerId -> { alias }
   const connectRef = useRef(null);
 
-  const sessionRef = useRef({ code: null, alias: null, intentional: false, attempts: 0, timer: null });
-
-  const hasActiveTransfer = useCallback(() => {
-    const receiving = Object.values(incommingRef.current)
-      .some((files) => Object.values(files).some((s) => !s.finalizing));
-    const sending = Object.keys(sendingRef.current).length > 0;
-    return receiving || sending;
-  }, []);
-
   const log = useCallback((msg) => {
     setLogs((prev) => [...prev, msg]);
   }, []);
@@ -134,11 +125,6 @@ export function useWebRTC() {
     if (state.confirmTimer) { clearInterval(state.confirmTimer); state.confirmTimer = null; }
 
     state.finalizing = true;
-    if (!hasActiveTransfer() && wsRef.current?.readyState === WebSocket.OPEN) {
-      log('transfers done — closing signaling');
-      sessionRef.current.intentional = true;
-      wsRef.current.close();
-    }
 
     try { await state.writable.close(); } 
     catch (e) {
@@ -364,12 +350,6 @@ export function useWebRTC() {
     if (msg.type === 'file-verified') {
       updateTransfer(peerId, msg.fileId, { done: true, finalizing:false });
       delete sendingRef.current[tkey(peerId, msg.fileId)];
-      
-      if (!hasActiveTransfer() && wsRef.current?.readyState === WebSocket.OPEN) {
-        log('transfers done — closing signaling');
-        sessionRef.current.intentional = true;
-        wsRef.current.close();
-      }
       patchTransfer(msg.fileId, peerId, { status: 'complete' }).catch(() => { });
       log(`peer confirmed: ${msg.fileId}`);
       return;
@@ -618,7 +598,17 @@ export function useWebRTC() {
       entry.fileChannel = ch;
       ch.binaryType = 'arraybuffer';
       ch.onopen = () => log(`file channel open: ${nameOf(peerMetaRef, peerId)}`);
-      ch.onclose = () => log(`file chanel closed: ${nameOf(peerMetaRef, peerId)}`);
+      ch.onclose = () => {
+        log(`file channel closed: ${nameOf(peerMetaRef, peerId)}`);
+        Object.entries(incommingRef.current[peerId] || {}).forEach(([fileId, s]) => {
+          if (!s.finalizing) updateTransfer(peerId, fileId, { interrupted: true });
+        });
+        Object.keys(sendingRef.current).forEach((k) => {
+          if (k.startsWith(`${peerId}:`)) {
+            updateTransfer(peerId, k.slice(peerId.length + 1), { interrupted: true });
+          }
+        });
+      };
       ch.onmessage = (e) => handleFileChunck(peerId, e.data);
     }
 
@@ -644,10 +634,6 @@ export function useWebRTC() {
   }, [log, handleControlMessage, handleFileChunck, announceResumable, reportConnectionType]);
 
   const connectToRoom = useCallback((code, alias) => {
-    sessionRef.current.code = code;
-    sessionRef.current.alias = alias;
-    sessionRef.current.intentional = false;
-
     setRoomCode(code);
 
     const myId = getPeerId();
@@ -661,7 +647,6 @@ export function useWebRTC() {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      sessionRef.current.attempts = 0;
       setSignaling('open');
       log('signaling connected');
     };
@@ -669,21 +654,6 @@ export function useWebRTC() {
     ws.onclose = () => {
       setSignaling('closed');
       log('signaling closed');
-
-      if(sessionRef.current.intentional) return;
-      if(!hasActiveTransfer()){
-        log('no active transfers - staying disconnected');
-        return;
-      }
-
-      const attempts = sessionRef.current.attempts + 1;
-      sessionRef.current.attempts = attempts;
-      const delay = Math.min(1000 * 2 **(attempts - 1), 30000);
-      log(`reconnecting in ${Math.round(delay/1000)}s (attemps ${attempts})`);
-      sessionRef.current.timer = setTimeout(()=>{
-        connectRef.current?.(sessionRef.current.code , sessionRef.current.alias);
-      }, delay);
-
     };
 
     ws.onerror = () => {
@@ -814,8 +784,6 @@ export function useWebRTC() {
 
   }, [log, createPeerConnection, updateTransfer]);
 
-  connectRef.current = connectToRoom;
-
   const createRoom = useCallback(async (alias) => {
     const res = await fetch(`${BASE_API_URL}/room/create`, { method: 'POST' });
     if (!res.ok) throw new Error(`room create failed: ${res.status}`);
@@ -840,8 +808,6 @@ export function useWebRTC() {
 
     wsRef.current?.close();
     wsRef.current = null;
-    sessionRef.current.intentional = true;
-    clearTimeout(sessionRef.current.timer);
 
     if (persist) {
       Object.entries(incommingRef.current).forEach(([peerId, files]) => {
@@ -1303,6 +1269,14 @@ export function useWebRTC() {
       log(`network check: ${type}`);
     });
   }, [log]);
+
+  useEffect(() => {
+    const onUnload = () => {
+      wsRef.current?.close(1000, 'unload');
+    };
+    window.addEventListener('beforeunload', onUnload);
+    return () => window.removeEventListener('beforeunload', onUnload);
+  }, []);
 
   return { peers, signaling, roomCode, selfId, messages, logs, transfers, createRoom, joinRoom, leaveRoom, persist, setPersist, sendMessage, sendFile, acceptFile, resumable, resumeBusy, availableMatches, resumeTransfer, discardTransfer, natType };
 }

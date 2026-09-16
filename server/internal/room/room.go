@@ -222,9 +222,12 @@ func (r *Room) LeaveRoom(peerId string, conn *websocket.Conn) {
 
 	current, ok := r.peers[peerId]
 	if !ok || current.Conn != conn {
+		log.Println("leave ignored, replaced:", peerId)
 		r.mu.Unlock()
 		return // already replaced by a newer connection
 	}
+
+	log.Println("leave ignored, replaced:", peerId)
 
 	delete(r.peers, peerId)
 	remaining := make([]*Peer, 0, len(r.peers))
