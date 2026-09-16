@@ -868,6 +868,19 @@ textarea {
   background: var(--pending);
 }
 
+.track__fill--working {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
 .transfer__open {
   display: inline-flex;
   align-items: center;

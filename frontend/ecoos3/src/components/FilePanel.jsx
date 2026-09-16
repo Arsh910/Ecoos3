@@ -6,7 +6,8 @@ import { pickFiles } from '../lib/filePicker';
 
 function status(transfer, incoming) {
   if (transfer.done) return 'Complete';
-  if (transfer.resending) return `Resuming ${transfer.resent}/${transfer.resendTotal} chunks`;
+  if (transfer.finalizing) return 'Finishing up…';
+  if (transfer.resending) return `Resuming · ${transfer.resent}/${transfer.resendTotal} chunks`;
   if (transfer.paused) return 'Paused';
   if (transfer.interrupted) return 'Interrupted resumes on reconnect';
   if (!transfer.accepted) {
@@ -60,7 +61,7 @@ function Transfer({ transfer, onAccept }) {
       {transfer.accepted && (
         <div className="track">
           <div
-            className={`track__fill ${transfer.done ? 'track__fill--done' : ''} ${transfer.interrupted || transfer.paused ? 'track__fill--stalled' : ''}`}
+            className={`track__fill ${transfer.done ? 'track__fill--done' : ''} ${transfer.finalizing ? 'track__fill--working' : ''} ${transfer.interrupted || transfer.paused ? 'track__fill--stalled' : ''}`}
             style={{ width: `${transfer.done ? 100 : pct}%` }}
           />
         </div>

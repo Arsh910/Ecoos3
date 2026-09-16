@@ -137,7 +137,7 @@ export function useWebRTC() {
 
     peersRef.current[peerId]?.control?.send(JSON.stringify({ type: 'file-verified', fileId }));
 
-    updateTransfer(peerId, fileId, { done: true, received: state.receivedCount});
+    updateTransfer(peerId, fileId, { done: true, finalizing: false, received: state.receivedCount});
     log(`file completed from ${nameOf(peerMetaRef, peerId)}: ${state.meta.name}`);
     
     // costs nothing and opening it never re-downloads the file.
@@ -222,7 +222,10 @@ export function useWebRTC() {
         }
       }
 
-      updateTransfer(peerId, fileId, { resending: false });
+      updateTransfer(peerId, fileId, { resending: false , finalizing: true});
+      while (fileChannel.bufferedAmount > 0) {
+        await new Promise((r) => setTimeout(r, 200));
+      }
 
       entry.control?.send(JSON.stringify({ type: 'file-complete', fileId }));
       log(`resend complete to ${nameOf(peerMetaRef, peerId)}`);
@@ -343,7 +346,7 @@ export function useWebRTC() {
     }
 
     if (msg.type === 'file-verified') {
-      updateTransfer(peerId, msg.fileId, { done: true });
+      updateTransfer(peerId, msg.fileId, { done: true, finalizing:false });
       delete sendingRef.current[tkey(peerId, msg.fileId)];
       patchTransfer(msg.fileId, peerId, { status: 'complete' }).catch(() => { });
       log(`peer confirmed: ${msg.fileId}`);
@@ -463,6 +466,10 @@ export function useWebRTC() {
 
       const missing = getMissingChunks(state);
       if (missing.length === 0) return;
+
+      if (state.receivedCount === state.meta.totalChunks && !state.completeSignal) {
+        updateTransfer(peerId, fileId, { finalizing: true }); 
+      }
 
       updateTransfer(peerId, fileId, { interrupted: false })
 
@@ -1037,6 +1044,11 @@ export function useWebRTC() {
           }
           break;
         }
+      }
+
+      updateTransfer(peerId, fileId, { finalizing: true });
+      while (fileChannel.readyState === 'open' && fileChannel.bufferedAmount > 0) {
+        await new Promise((r) => setTimeout(r, 200));
       }
 
       control.send(JSON.stringify({ type: 'file-complete', fileId }));
