@@ -588,9 +588,7 @@ export function useWebRTC() {
       );
             
       if (pc.connectionState === 'connected') reportConnectionType(peerId).catch(() => { });
-      log(`peer state: ${pc.connectionState}`);
       if (pc.connectionState === 'failed' && hasTransferWith(peerId)) {
-        log(`reconnectToPeer fired`);
         log(`connection to ${nameOf(peerMetaRef, peerId)} failed; rejoining`);
         reconnectToPeer(peerId).catch((e) => log(`rejoin failed: ${e.message}`));
       }
@@ -642,6 +640,14 @@ export function useWebRTC() {
     return entry;
 
   }, [log, handleControlMessage, handleFileChunck, announceResumable, reportConnectionType]);
+
+  const hasTransferWith = useCallback((peerId) => {
+    const receiving = Object.values(incommingRef.current[peerId] || {})
+      .some((s) => !s.finalizing);
+    const sending = Object.keys(sendingRef.current)
+      .some((k) => k.startsWith(`${peerId}:`));
+    return receiving || sending;
+  }, []);
 
   const reconnectToPeer = useCallback(async (peerId) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
