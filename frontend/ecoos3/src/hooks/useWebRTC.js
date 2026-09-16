@@ -121,7 +121,8 @@ export function useWebRTC() {
 
     if (state.finalizing) return;
     state.finalizing = true;
-
+    updateTransfer(peerId, fileId, { finalizing: true })
+    
     if (state.confirmTimer) { clearInterval(state.confirmTimer); state.confirmTimer = null; }
 
     try { await state.writable.close(); } 
