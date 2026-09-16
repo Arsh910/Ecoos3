@@ -413,6 +413,8 @@ export function useWebRTC() {
     }
 
     if (state.receivedCount === state.meta.totalChunks && !state.completeSignal && !state.confirmTimer) {
+      updateTransfer(peerId, fileId, { finalizing: true });
+
       let attempts = 0;
       const ask = () => {
         if (state.completeSignal || state.finalizing) {
