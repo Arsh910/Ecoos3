@@ -599,6 +599,7 @@ export function useWebRTC() {
       connectRef.current?.(code, alias);
     } 
     catch (e) {
+      log(`rejoin attempt ${attempt}: ${e.name}: ${e.message}`);
       if (attempt >= 6) { log(`rejoin gave up: ${e.message}`); return; }  
       const delay = Math.min(1000 * 2 ** (attempt - 1), 30000);
       log(`rejoin failed (${e.message}), retrying in ${delay / 1000}s`);
