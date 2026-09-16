@@ -588,8 +588,9 @@ export function useWebRTC() {
       );
             
       if (pc.connectionState === 'connected') reportConnectionType(peerId).catch(() => { });
-      
+      log(`peer state: ${pc.connectionState}`);
       if (pc.connectionState === 'failed' && hasTransferWith(peerId)) {
+        log(`reconnectToPeer fired`);
         log(`connection to ${nameOf(peerMetaRef, peerId)} failed; rejoining`);
         reconnectToPeer(peerId).catch((e) => log(`rejoin failed: ${e.message}`));
       }
