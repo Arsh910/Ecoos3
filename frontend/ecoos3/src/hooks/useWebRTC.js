@@ -601,6 +601,14 @@ export function useWebRTC() {
 
   reconnectRef.current = reconnectToPeer;
 
+  const hasTransferWith = useCallback((peerId) => {
+    const receiving = Object.values(incommingRef.current[peerId] || {})
+      .some((s) => !s.finalizing);
+    const sending = Object.keys(sendingRef.current)
+      .some((k) => k.startsWith(`${peerId}:`));
+    return receiving || sending;
+  }, []);
+
   const createPeerConnection = useCallback((peerId, isOfferer) => {
     const existing = peersRef.current[peerId];
     if (existing) return existing;
@@ -689,14 +697,6 @@ export function useWebRTC() {
   }, [log, handleControlMessage, handleFileChunck, announceResumable, reportConnectionType, updateTransfer, reconnectToPeer, hasTransferWith]);
 
   createPcRef.current = createPeerConnection;
-
-  const hasTransferWith = useCallback((peerId) => {
-    const receiving = Object.values(incommingRef.current[peerId] || {})
-      .some((s) => !s.finalizing);
-    const sending = Object.keys(sendingRef.current)
-      .some((k) => k.startsWith(`${peerId}:`));
-    return receiving || sending;
-  }, []);
 
   const connectToRoom = useCallback((code, alias) => {
     roomRef.current = { code, alias };
