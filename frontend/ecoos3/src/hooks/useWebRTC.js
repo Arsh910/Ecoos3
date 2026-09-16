@@ -770,6 +770,13 @@ export function useWebRTC() {
           }).catch(() => { });
         });
 
+        Object.keys(sendingRef.current).forEach((k) => {
+          if (!k.startsWith(`${msg.peerId}:`)) return;
+          const fileId = k.slice(msg.peerId.length + 1);
+          updateTransfer(msg.peerId, fileId, { interrupted: true });
+          patchTransfer(fileId, msg.peerId, { status: 'paused' }).catch(() => { });
+        });
+
         delete peersRef.current[msg.peerId];
 
         setPeers((prev) => prev.filter((p) => p.id !== msg.peerId));
