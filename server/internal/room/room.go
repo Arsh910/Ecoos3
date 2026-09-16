@@ -30,10 +30,9 @@ type Peer struct {
 }
 
 type Room struct {
-	Code    string
-	peers   map[string]*Peer
-	emptyAt time.Time
-	mu      sync.Mutex
+	Code  string
+	peers map[string]*Peer
+	mu    sync.Mutex
 }
 
 type RoomManger struct {
@@ -128,8 +127,8 @@ func (rm *RoomManger) RemoveRoomIfEmpty(code string) {
 	empty := len(room.peers) == 0
 	room.mu.Unlock()
 
-	if empty && room.emptyAt.IsZero() {
-		room.emptyAt = time.Now()
+	if empty {
+		delete(rm.rooms, code)
 		log.Println("room removed: ", code)
 	}
 }
@@ -156,7 +155,6 @@ func (r *Room) JoinRoom(peer *Peer) error {
 	}
 
 	r.peers[peer.ID] = peer
-	r.emptyAt = time.Time{}
 	r.mu.Unlock()
 
 	if isReconnect && old.Conn != peer.Conn {
@@ -224,29 +222,4 @@ func (r *Room) LeaveRoom(peerId string, conn *websocket.Conn) {
 	}
 
 	log.Println("peer left room", r.Code, "| total peers: ", len(remaining))
-}
-
-// sweeeper to delete rooms
-func (rm *RoomManger) StartSweeper(ttl time.Duration) {
-	go func() {
-		ticker := time.NewTicker(time.Minute)
-		defer ticker.Stop()
-
-		for range ticker.C {
-			rm.mu.Lock()
-			for code, room := range rm.rooms {
-				room.mu.Lock()
-				expired := len(room.peers) == 0 &&
-					!room.emptyAt.IsZero() &&
-					time.Since(room.emptyAt) > ttl
-				room.mu.Unlock()
-
-				if expired {
-					delete(rm.rooms, code)
-					log.Println("room expired:", code)
-				}
-			}
-			rm.mu.Unlock()
-		}
-	}()
 }
