@@ -15,7 +15,11 @@ func (app *application) routes() http.Handler {
 	v1 := g.Group("api/v1")
 	v1.Use(cors(app.corsOrigins))
 	v1.Use(rateLimiter(r1))
+
 	{
+		v1.OPTIONS("/*path", func(c *gin.Context) {
+			c.Status(http.StatusNoContent)
+		})
 		v1.GET("/health", func(c *gin.Context) {
 			var startedAt = time.Now()
 			c.JSON(200, gin.H{
