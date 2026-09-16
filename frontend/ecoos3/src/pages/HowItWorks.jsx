@@ -192,10 +192,35 @@ export function HowItWorks() {
           and unfinished transfers are cleared after 30 days.
         </p>
 
+        <h2 id="reconnect">What happens if the connection drops</h2>
+        <p>
+          Once two browsers are connected, file data goes straight between them, and the signaling
+          connection isn’t doing anything — so it closes. If the direct connection between the two
+          browsers later fails, each one reopens a connection to the signaling server on its own and
+          rejoins using the same room code. If that room had since been cleaned up, it’s recreated, so
+          the original code keeps working and anyone else holding it can still join.
+        </p>
+        <p>
+          The two browsers then reconnect to each other, and the transfer continues from where it
+          stopped using the bitmap described above: the receiver already knows which chunks it has, so
+          only the missing ones are sent again. An interruption at 80% resumes at 80%.
+        </p>
+        <p>
+          This is automatic and separate from clicking <em>Resume</em>. Automatic reconnection handles a
+          connection failing while both tabs stay open — there’s nothing to click. Resume is for after a
+          reload, or picking up a transfer again days later, when the two browsers have to find each
+          other from scratch.
+        </p>
+
         <h2 id="limits">Limits worth knowing</h2>
         <ul>
           <li>Receiving needs the File System Access API, which today means a Chromium browser.</li>
-          <li>Both people must be online at the same time.</li>
+          <li>Both people must be online at the same time for a transfer to progress.</li>
+          <li>
+            Reconnecting isn’t instant — the browser can take a minute or so to decide a connection is
+            dead before it tries again.
+          </li>
+          <li>If a device is closed entirely, the transfer waits until it’s reopened and resumed by hand.</li>
           <li>
             A room holds up to four people. Every pair has its own direct connection, so sending to
             three people splits your upload between them.

@@ -122,6 +122,28 @@ export function LargeFileTransfer() {
           protocol overhead and other traffic on the connection.
         </p>
 
+        <h2 id="reconnect">Recovering from a dropped connection mid-transfer</h2>
+        <p>
+          A transfer like the ones above can run for hours. Once it’s underway, the two devices send
+          data directly to each other and no longer need the signaling connection that helped them find
+          each other, so that connection closes. If the direct connection between the devices then
+          fails — a Wi-Fi switch, a sleeping laptop, a dropped network — each device reopens a
+          connection to the signaling server on its own and rejoins using the same room code. If that
+          room had since been cleaned up, it’s recreated, so the code still works.
+        </p>
+        <p>
+          The two devices reconnect to each other and the transfer continues from where it stopped. The
+          receiver already knows which chunks it has, so only the missing ones are sent again — an
+          interruption at 80% resumes at 80%. A cloud upload that fails partway usually means starting
+          over; here, the progress made on both ends is kept.
+        </p>
+        <p>
+          This reconnection is automatic, but it isn’t instant or unconditional: both devices still need
+          to be online at the same time for the transfer to progress, the browser can take a minute or
+          so to decide a connection is dead before it tries again, and if a device is closed entirely,
+          the transfer waits until it’s reopened and resumed by hand.
+        </p>
+
         <h2 id="right">When ecoos3 is a good choice</h2>
         <ul>
           <li>The file is bigger than your cloud plan allows, and you don’t want to pay for more storage just to send it once.</li>

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -60,6 +61,18 @@ func NewRoomManager() *RoomManger {
 	}
 }
 
+func IsValidCode(code string) bool {
+	if len(code) != roomCodeLength {
+		return false
+	}
+	for _, r := range code {
+		if !strings.ContainsRune(roomCodeChars, r) {
+			return false
+		}
+	}
+	return true
+}
+
 func GenerateRoomCode() string {
 	b := make([]byte, roomCodeLength)
 
@@ -98,6 +111,22 @@ func (rm *RoomManger) CreateRoom() *Room {
 
 	rm.rooms[code] = room
 	log.Println("room created:", code)
+	return room
+}
+
+func (rm *RoomManger) EnsureRoom(code string) *Room {
+	rm.mu.Lock()
+	defer rm.mu.Unlock()
+
+	if room, ok := rm.rooms[code]; ok {
+		room.mu.Lock()
+		room.emptyAt = time.Time{}
+		room.mu.Unlock()
+		return room
+	}
+
+	room := &Room{Code: code, peers: make(map[string]*Peer)}
+	rm.rooms[code] = room
 	return room
 }
 

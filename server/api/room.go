@@ -13,8 +13,28 @@ import (
 )
 
 func (app *application) HandleCreateRoom(c *gin.Context) {
-	room := app.rm.CreateRoom()
-	c.JSON(http.StatusCreated, gin.H{"code": room.Code})
+	var body struct {
+		Code string `json:"code"`
+	}
+
+	if err := c.BindJSON(&body); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
+
+	code := strings.ToUpper(strings.TrimSpace(body.Code))
+	if code == "" {
+		room := app.rm.CreateRoom()
+		c.JSON(http.StatusCreated, gin.H{"code": room.Code})
+		return
+	}
+
+	if !room.IsValidCode(code) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid code"})
+		return
+	}
+
+	room := app.rm.EnsureRoom(code)
+	c.JSON(http.StatusOK, gin.H{"code": room.Code})
 }
 
 const (
