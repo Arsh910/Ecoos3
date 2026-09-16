@@ -47,6 +47,7 @@ export function useWebRTC() {
   const sendingRef = useRef({});         // "peerId:fileId" -> { file, meta }
   const peerMetaRef = useRef({});        // peerId -> { alias }
   const connectRef = useRef(null);
+  const roomRef = useRef({ code: null, alias: null });
 
   const log = useCallback((msg) => {
     setLogs((prev) => [...prev, msg]);
@@ -575,6 +576,7 @@ export function useWebRTC() {
     peersRef.current[peerId] = entry;
 
     pc.onicecandidate = (event) => {
+      if (wsRef.current?.readyState !== WebSocket.OPEN) return;
       if (event.candidate) {
         wsRef.current.send(JSON.stringify({ type: 'candidate', to: peerId, candidate: event.candidate }));
       }
@@ -584,7 +586,14 @@ export function useWebRTC() {
       setPeers((prev) =>
         prev.map((p) => (p.id === peerId ? { ...p, state: pc.connectionState } : p))
       );
+            
       if (pc.connectionState === 'connected') reportConnectionType(peerId).catch(() => { });
+      
+      if (pc.connectionState === 'failed' && hasTransferWith(peerId)) {
+        log(`connection to ${nameOf(peerMetaRef, peerId)} failed; rejoining`);
+        reconnectToPeer(peerId).catch((e) => log(`rejoin failed: ${e.message}`));
+      }
+
     }
 
     const wireControl = (ch) => {
@@ -633,7 +642,22 @@ export function useWebRTC() {
 
   }, [log, handleControlMessage, handleFileChunck, announceResumable, reportConnectionType]);
 
+  const reconnectToPeer = useCallback(async (peerId) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    const { code, alias } = roomRef.current;
+    if (!code) return;
+
+    log('reconnecting');
+    await fetch(`${BASE_API_URL}/room/ensure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+    connectRef.current?.(code, alias);
+  }, [log]);
+
   const connectToRoom = useCallback((code, alias) => {
+    roomRef.current = { code, alias };
     setRoomCode(code);
 
     const myId = getPeerId();
@@ -808,6 +832,7 @@ export function useWebRTC() {
 
     wsRef.current?.close();
     wsRef.current = null;
+    roomRef.current = { code: null, alias: null };
 
     if (persist) {
       Object.entries(incommingRef.current).forEach(([peerId, files]) => {
