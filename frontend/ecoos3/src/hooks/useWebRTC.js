@@ -728,6 +728,18 @@ export function useWebRTC() {
     ws.onclose = () => {
       setSignaling('closed');
       log('signaling closed');
+
+      const anyTransfer =
+        Object.values(incommingRef.current).some((files) =>
+          Object.values(files).some((s) => !s.finalizing)) ||
+        Object.keys(sendingRef.current).length > 0;
+
+      if (!anyTransfer) return;
+      if (!roomRef.current.code) return;
+      if (!navigator.onLine) return;
+
+      log('signaling dropped during transfer; rejoining');
+      setTimeout(() => reconnectRef.current?.(null, 1), 2000);
     };
 
     ws.onerror = () => {
