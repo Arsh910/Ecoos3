@@ -858,6 +858,8 @@ export function useWebRTC() {
 
   }, [log, createPeerConnection, updateTransfer]);
 
+  connectRef.current = connectToRoom;
+
   const createRoom = useCallback(async (alias) => {
     const res = await fetch(`${BASE_API_URL}/room/create`, { method: 'POST' });
     if (!res.ok) throw new Error(`room create failed: ${res.status}`);
