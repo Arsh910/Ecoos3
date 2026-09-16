@@ -564,6 +564,21 @@ export function useWebRTC() {
     return local ?? null;
   }, [log]);
 
+  const reconnectToPeer = useCallback(async (peerId) => {
+    log(`reconnect: socket=${ws?.readyState}, room=${roomRef.current.code}`);
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    const { code, alias } = roomRef.current;
+    if (!code) return;
+
+    log('reconnecting');
+    await fetch(`${BASE_API_URL}/room/ensure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+    connectRef.current?.(code, alias);
+  }, [log]);
+
   const createPeerConnection = useCallback((peerId, isOfferer) => {
     const existing = peersRef.current[peerId];
     if (existing) return existing;
@@ -648,20 +663,6 @@ export function useWebRTC() {
       .some((k) => k.startsWith(`${peerId}:`));
     return receiving || sending;
   }, []);
-
-  const reconnectToPeer = useCallback(async (peerId) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
-    const { code, alias } = roomRef.current;
-    if (!code) return;
-
-    log('reconnecting');
-    await fetch(`${BASE_API_URL}/room/ensure`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code }),
-    });
-    connectRef.current?.(code, alias);
-  }, [log]);
 
   const connectToRoom = useCallback((code, alias) => {
     roomRef.current = { code, alias };
