@@ -579,6 +579,11 @@ export function useWebRTC() {
 
     if (ws?.readyState === WebSocket.CONNECTING) return;
 
+    if (!navigator.onLine) {
+      log('offline; waiting for network');
+      return;
+    }
+
     const { code, alias } = roomRef.current;
     if (!code) return;
 
@@ -587,15 +592,18 @@ export function useWebRTC() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code }),
+        signal: AbortSignal.timeout(60000),
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
       log('reconnecting');
       connectRef.current?.(code, alias);
-    } catch (e) {
-      if (attempt >= 6) { log(`rejoin gave up: ${e.message}`); return; }
+    } 
+    catch (e) {
+      if (attempt >= 6) { log(`rejoin gave up: ${e.message}`); return; }  
       const delay = Math.min(1000 * 2 ** (attempt - 1), 30000);
       log(`rejoin failed (${e.message}), retrying in ${delay / 1000}s`);
       setTimeout(() => reconnectRef.current?.(peerId, attempt + 1), delay);
+    
     }
   }, [log]);
 
