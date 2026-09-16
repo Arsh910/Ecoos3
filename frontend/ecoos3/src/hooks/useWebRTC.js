@@ -566,7 +566,7 @@ export function useWebRTC() {
     return local ?? null;
   }, [log]);
 
-  const reconnectToPeer = useCallback(async (attempt = 1) => {
+  const reconnectToPeer = useCallback(async (peerId, attempt = 1) => {
     const ws = wsRef.current;
 
     if (ws?.readyState === WebSocket.OPEN) {
@@ -595,7 +595,7 @@ export function useWebRTC() {
       if (attempt >= 6) { log(`rejoin gave up: ${e.message}`); return; }
       const delay = Math.min(1000 * 2 ** (attempt - 1), 30000);
       log(`rejoin failed (${e.message}), retrying in ${delay / 1000}s`);
-      setTimeout(() => reconnectRef.current?.(attempt + 1), delay);
+      setTimeout(() => reconnectRef.current?.(peerId, attempt + 1), delay);
     }
   }, [log]);
 
@@ -637,9 +637,9 @@ export function useWebRTC() {
             updateTransfer(peerId, k.slice(peerId.length + 1), { interrupted: true });
           }
         });
+
+        reconnectToPeer(peerId).catch((e) => log(`reconnect error: ${e.message}`));
       }
-      
-      reconnectToPeer(peerId).catch((e) => log(`reconnect error: ${e.message}`));
     }
 
     const wireControl = (ch) => {
@@ -686,7 +686,7 @@ export function useWebRTC() {
 
     return entry;
 
-  }, [log, handleControlMessage, handleFileChunck, announceResumable, reportConnectionType]);
+  }, [log, handleControlMessage, handleFileChunck, announceResumable, reportConnectionType, updateTransfer, reconnectToPeer, hasTransferWith]);
 
   createPcRef.current = createPeerConnection;
 
@@ -1340,10 +1340,11 @@ export function useWebRTC() {
   // reconnect on online
   useEffect(() => {
     const onOnline = () => {
+      if (!navigator.onLine) return;
       if (!roomRef.current.code) return;
       if (wsRef.current?.readyState === WebSocket.OPEN) return;
       log('network back; reconnecting');
-      reconnectRef.current?.();
+      reconnectRef.current?.(null, 1);
     };
     window.addEventListener('online', onOnline);
     return () => window.removeEventListener('online', onOnline);
