@@ -49,6 +49,7 @@ export function useWebRTC() {
   const connectRef = useRef(null);
   const roomRef = useRef({ code: null, alias: null });
   const reconnectRef = useRef(null);
+  const createPcRef = useRef(null);
 
   const log = useCallback((msg) => {
     setLogs((prev) => [...prev, msg]);
@@ -567,7 +568,16 @@ export function useWebRTC() {
 
   const reconnectToPeer = useCallback(async (attempt = 1) => {
     const ws = wsRef.current;
-    if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) return;
+
+    if (ws?.readyState === WebSocket.OPEN) {
+      log(`rebuilding connection to ${nameOf(peerMetaRef, peerId)}`);
+      peersRef.current[peerId]?.pc.close();
+      delete peersRef.current[peerId];
+      createPcRef.current?.(peerId, shouldOffer(selfIdRef.current, peerId));
+      return;
+    }
+
+    if (ws?.readyState === WebSocket.CONNECTING) return;
 
     const { code, alias } = roomRef.current;
     if (!code) return;
@@ -628,7 +638,8 @@ export function useWebRTC() {
           }
         });
       }
-
+      
+      reconnectToPeer(peerId).catch((e) => log(`reconnect error: ${e.message}`));
     }
 
     const wireControl = (ch) => {
@@ -676,6 +687,8 @@ export function useWebRTC() {
     return entry;
 
   }, [log, handleControlMessage, handleFileChunck, announceResumable, reportConnectionType]);
+
+  createPcRef.current = createPeerConnection;
 
   const hasTransferWith = useCallback((peerId) => {
     const receiving = Object.values(incommingRef.current[peerId] || {})
