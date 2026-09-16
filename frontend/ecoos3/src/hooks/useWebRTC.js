@@ -409,12 +409,15 @@ export function useWebRTC() {
     }
 
     if (state.receivedCount === state.meta.totalChunks && !state.completeSignal && !state.confirmTimer) {
+      let attempts = 0;
       const ask = () => {
         if (state.completeSignal || state.finalizing) {
           clearInterval(state.confirmTimer);
           state.confirmTimer = null;
           return;
         }
+        attempts += 1;
+        log(`confirm-complete attempt ${attempts}, control=${ch?.readyState}`);
         log('all chunks in, asking sender to confirm');
         peersRef.current[peerId]?.control?.send(JSON.stringify({ type: 'confirm-complete', fileId }));
       };
