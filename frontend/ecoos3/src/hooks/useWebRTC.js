@@ -48,6 +48,7 @@ export function useWebRTC() {
   const peerMetaRef = useRef({});        // peerId -> { alias }
   const connectRef = useRef(null);
   const roomRef = useRef({ code: null, alias: null });
+  const reconnectRef = useRef(null);
 
   const log = useCallback((msg) => {
     setLogs((prev) => [...prev, msg]);
@@ -564,21 +565,31 @@ export function useWebRTC() {
     return local ?? null;
   }, [log]);
 
-  const reconnectToPeer = useCallback(async (peerId) => {
+  const reconnectToPeer = useCallback(async (attempt = 1) => {
     const ws = wsRef.current;
-    log(`reconnect: socket=${ws?.readyState}, room=${roomRef.current.code}`);
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) return;
+
     const { code, alias } = roomRef.current;
     if (!code) return;
 
-    log('reconnecting');
-    await fetch(`${BASE_API_URL}/room/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code }),
-    });
-    connectRef.current?.(code, alias);
+    try {
+      const res = await fetch(`${BASE_API_URL}/room/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      log('reconnecting');
+      connectRef.current?.(code, alias);
+    } catch (e) {
+      if (attempt >= 6) { log(`rejoin gave up: ${e.message}`); return; }
+      const delay = Math.min(1000 * 2 ** (attempt - 1), 30000);
+      log(`rejoin failed (${e.message}), retrying in ${delay / 1000}s`);
+      setTimeout(() => reconnectRef.current?.(attempt + 1), delay);
+    }
   }, [log]);
+
+  reconnectRef.current = reconnectToPeer;
 
   const createPeerConnection = useCallback((peerId, isOfferer) => {
     const existing = peersRef.current[peerId];
@@ -605,8 +616,17 @@ export function useWebRTC() {
             
       if (pc.connectionState === 'connected') reportConnectionType(peerId).catch(() => { });
       if (pc.connectionState === 'failed' && hasTransferWith(peerId)) {
-        log(`connection to ${nameOf(peerMetaRef, peerId)} failed; rejoining`);
-        reconnectToPeer(peerId).catch((e) => log(`rejoin failed: ${e.message}`));
+        log(`connection to ${nameOf(peerMetaRef, peerId)} failed;`);
+        
+        Object.entries(incommingRef.current[peerId] || {}).forEach(([fileId, s]) => {
+          if (!s.finalizing) updateTransfer(peerId, fileId, { interrupted: true });
+        });
+
+        Object.keys(sendingRef.current).forEach((k) => {
+          if (k.startsWith(`${peerId}:`)) {
+            updateTransfer(peerId, k.slice(peerId.length + 1), { interrupted: true });
+          }
+        });
       }
 
     }
@@ -1302,6 +1322,18 @@ export function useWebRTC() {
       setNatType(type);
       log(`network check: ${type}`);
     });
+  }, [log]);
+
+  // reconnect on online
+  useEffect(() => {
+    const onOnline = () => {
+      if (!roomRef.current.code) return;
+      if (wsRef.current?.readyState === WebSocket.OPEN) return;
+      log('network back; reconnecting');
+      reconnectRef.current?.();
+    };
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
   }, [log]);
 
   useEffect(() => {
