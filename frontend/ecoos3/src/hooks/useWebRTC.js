@@ -417,6 +417,7 @@ export function useWebRTC() {
           return;
         }
         attempts += 1;
+        const ch = peersRef.current[peerId]?.control;
         log(`confirm-complete attempt ${attempts}, control=${ch?.readyState}`);
         log('all chunks in, asking sender to confirm');
         peersRef.current[peerId]?.control?.send(JSON.stringify({ type: 'confirm-complete', fileId }));
