@@ -565,13 +565,14 @@ export function useWebRTC() {
   }, [log]);
 
   const reconnectToPeer = useCallback(async (peerId) => {
+    const ws = wsRef.current;
     log(`reconnect: socket=${ws?.readyState}, room=${roomRef.current.code}`);
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
     const { code, alias } = roomRef.current;
     if (!code) return;
 
     log('reconnecting');
-    await fetch(`${BASE_API_URL}/room/ensure`, {
+    await fetch(`${BASE_API_URL}/room/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code }),
