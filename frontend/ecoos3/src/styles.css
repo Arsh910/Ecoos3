@@ -873,7 +873,12 @@ textarea {
 }
 
 .track__fill--stalled {
-  background: var(--pending);
+  background-color: var(--pending);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 5px,
+    #00000038 5px 10px
+  );
 }
 
 .track__fill--working {

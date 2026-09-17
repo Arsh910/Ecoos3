@@ -6,10 +6,10 @@ import { pickFiles } from '../lib/filePicker';
 
 function status(transfer, incoming) {
   if (transfer.done) return 'Complete';
-  if (transfer.finalizing) return 'Finishing up…';
+  if (transfer.finalizing) return 'Finishing up.. waiting for the other side';
   if (transfer.resending) return `Resuming · ${transfer.resent}/${transfer.resendTotal} chunks`;
   if (transfer.paused) return 'Paused';
-  if (transfer.interrupted) return 'Interrupted resumes on reconnect';
+  if (transfer.interrupted) return 'Interrupted.. resumes once reconnected';
   if (!transfer.accepted) {
     if (!incoming) return 'Waiting for peer';
     return hasFSA ? 'Waiting for you' : 'Cannot receive in this browser';

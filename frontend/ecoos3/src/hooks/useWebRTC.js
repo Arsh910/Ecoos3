@@ -13,6 +13,8 @@ const BASE_SOCKET_URL = import.meta.env.VITE_SOCKET_URL
 const BASE_API_URL = import.meta.env.VITE_API_URL
 
 const CHUNK_SIZE = 64 * 1024;
+const STALL_AFTER = 2 * 60 * 1000;      // keep retrying past this, just slower, and say so
+const STALL_RETRY_DELAY = 30 * 1000;
 const BUFFER_LOW_THRESHOLD = CHUNK_SIZE * 4;
 const PREVIEWABLE = /^(image|video|audio|text)\/|^application\/pdf$/;
 const tkey = (peerId, fileId) => `${peerId}:${fileId}`;
@@ -35,6 +37,7 @@ export function useWebRTC() {
   const [resumeBusy, setResumeBusy] = useState(null);
   const [availableMatches, setAvailableMatches] = useState({});
   const [natType, setNatType] = useState('unknown');
+  const [rejoinStalled, setRejoinStalled] = useState(false);
 
   const wsRef = useRef(null);
   const selfIdRef = useRef(null);
@@ -50,6 +53,7 @@ export function useWebRTC() {
   const roomRef = useRef({ code: null, alias: null });
   const reconnectRef = useRef(null);
   const rejoinTimerRef = useRef(null);
+  const rejoinStartRef = useRef(null);
 
   const log = useCallback((msg) => {
     const t = new Date().toLocaleTimeString();
@@ -275,7 +279,6 @@ export function useWebRTC() {
             peersRef.current[peerId]?.control?.send(JSON.stringify({
               type: 'resume-request', fileId: remote.transferId, missing,
             }));
-            log(`match: ${remote.fileName} — ${missing.length} chunks missing`);
           }
           return;
         }
@@ -292,7 +295,6 @@ export function useWebRTC() {
             sent: remote.have,
             direction: 'sending',
           });
-          log(`match: ${remote.fileName} — peer has ${remote.have}/${remote.totalChunks}`);
         }
       });
 
@@ -585,8 +587,17 @@ export function useWebRTC() {
     const { code, alias } = roomRef.current;
     if (!code) return;
 
+    if (!rejoinStartRef.current) rejoinStartRef.current = Date.now();
+    const stalled = () => Date.now() - rejoinStartRef.current > STALL_AFTER;
+
+    if (stalled() && !rejoinStalled) {
+      setRejoinStalled(true);
+      log('still unable to reconnect');
+    }
+
     const retry = (next) => {
-      const delay = Math.min(1000 * 2 ** (next - 2), 15000);
+      const base = Math.min(1000 * 2 ** (next - 2), 15000);
+      const delay = stalled() ? STALL_RETRY_DELAY : base;
       rejoinTimerRef.current = setTimeout(() => reconnectRef.current?.(next), delay);
     };
 
@@ -603,13 +614,15 @@ export function useWebRTC() {
       );
       if (!res.ok) throw new Error(`status ${res.status}`);
       log('rejoining room');
+      rejoinStartRef.current = null;
+      setRejoinStalled(false);
       connectRef.current?.(code, alias);
     } catch (e) {
       log(`rejoin failed (${e.message}); retrying`);
       retry(attempt + 1);
     }
 
-  }, [log]);
+  }, [log, rejoinStalled]);
 
   reconnectRef.current = reconnectToPeer;
 
@@ -886,6 +899,10 @@ export function useWebRTC() {
     wsRef.current?.close();
     wsRef.current = null;
     roomRef.current = { code: null, alias: null };
+
+    clearTimeout(rejoinTimerRef.current);
+    rejoinStartRef.current = null;
+    setRejoinStalled(false);
 
     if (persist) {
       Object.entries(incommingRef.current).forEach(([peerId, files]) => {
@@ -1366,5 +1383,5 @@ export function useWebRTC() {
     return () => window.removeEventListener('beforeunload', onUnload);
   }, []);
 
-  return { peers, signaling, roomCode, selfId, messages, logs, transfers, createRoom, joinRoom, leaveRoom, persist, setPersist, sendMessage, sendFile, acceptFile, resumable, resumeBusy, availableMatches, resumeTransfer, discardTransfer, natType };
+  return { peers, signaling, roomCode, selfId, messages, logs, transfers, createRoom, joinRoom, leaveRoom, persist, setPersist, sendMessage, sendFile, acceptFile, resumable, resumeBusy, availableMatches, resumeTransfer, discardTransfer, natType, rejoinStalled };
 }

@@ -10,6 +10,7 @@ import { PeerList } from './components/PeerList';
 import { Identity } from './components/Identity';
 import { ResumePanel } from './components/ResumePanel';
 import { NatBanner } from './components/NatBanner';
+import { ConnectionStatus } from './components/ConnectionStatus';
 import { Icon } from './components/Icon';
 import { hasFSA } from './lib/capabilities';
 import logo from './assets/site/logo.webp';
@@ -37,6 +38,7 @@ function App() {
     natType,
     resumeTransfer,
     discardTransfer,
+    rejoinStalled,
   } = useWebRTC();
 
   const [selected, setSelected] = useState([]);
@@ -48,6 +50,11 @@ function App() {
   );
 
   const offline = connectedPeers.length === 0;
+
+  const activeTransfer = useMemo(
+    () => Object.values(transfers).some((t) => t.accepted && !t.done),
+    [transfers],
+  );
 
   // Send only to peers that are both selected and actually connected.
   const targets = useMemo(() => {
@@ -76,6 +83,8 @@ function App() {
         </div>
         <Identity alias={alias} onAlias={setAlias} selfId={selfId} />
       </header>
+
+      <ConnectionStatus signaling={signaling} roomCode={roomCode} rejoinStalled={rejoinStalled} activeTransfer={activeTransfer}/>
 
       {!hasFSA && (
         <p className="notice">
