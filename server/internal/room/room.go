@@ -226,7 +226,7 @@ func (r *Room) JoinRoom(peer *Peer) error {
 		})
 	}
 
-	log.Println("peer joined room", r.Code, "| Total peers: ", len(targets)+1)
+	log.Println("peer joined room", r.Code, "| total peers: ", len(targets)+1)
 
 	return nil
 }
