@@ -218,7 +218,6 @@ func (r *Room) JoinRoom(peer *Peer) error {
 		"self":  peer.ID,
 	})
 
-	// targets is the snapshot taken under the lock: everyone but the joiner.
 	for _, p := range targets {
 		p.Send(map[string]any{
 			"type":   "peer-joined",
