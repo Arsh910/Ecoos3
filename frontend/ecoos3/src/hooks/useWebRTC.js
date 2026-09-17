@@ -15,6 +15,7 @@ const BASE_API_URL = import.meta.env.VITE_API_URL
 const CHUNK_SIZE = 64 * 1024;
 const STALL_AFTER = 2 * 60 * 1000;      // keep retrying past this, just slower, and say so
 const STALL_RETRY_DELAY = 30 * 1000;
+const GIVE_UP_AFTER = 10 * 60 * 1000;   // past this, stop on our own and wait to be asked
 const BUFFER_LOW_THRESHOLD = CHUNK_SIZE * 4;
 const PREVIEWABLE = /^(image|video|audio|text)\/|^application\/pdf$/;
 const tkey = (peerId, fileId) => `${peerId}:${fileId}`;
@@ -38,6 +39,7 @@ export function useWebRTC() {
   const [availableMatches, setAvailableMatches] = useState({});
   const [natType, setNatType] = useState('unknown');
   const [rejoinStalled, setRejoinStalled] = useState(false);
+  const [rejoinGaveUp, setRejoinGaveUp] = useState(false);
 
   const wsRef = useRef(null);
   const selfIdRef = useRef(null);
@@ -578,27 +580,27 @@ export function useWebRTC() {
 
     if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) return;
 
-    const anyTransfer =
-      Object.values(incommingRef.current).some((files) =>
-        Object.values(files).some((s) => !s.finalizing)) ||
-      Object.keys(sendingRef.current).length > 0;
-
-    if (!anyTransfer) return;
-
     const { code, alias } = roomRef.current;
     if (!code) return;
 
     if (!rejoinStartRef.current) rejoinStartRef.current = Date.now();
-    const stalled = () => Date.now() - rejoinStartRef.current > STALL_AFTER;
+    const downFor = () => Date.now() - rejoinStartRef.current;
 
-    if (stalled() && !rejoinStalled) {
+    if (downFor() > GIVE_UP_AFTER) {
+      setRejoinGaveUp(true);
+      log('stopped reconnecting — use Retry to try again');
+      return;
+    }
+
+    if (downFor() > STALL_AFTER && !rejoinStalled) {
       setRejoinStalled(true);
       log('still unable to reconnect');
     }
 
+    // Read from the ref, not the state: the state captured here goes stale between attempts.
     const retry = (next) => {
       const base = Math.min(1000 * 2 ** (next - 2), 15000);
-      const delay = stalled() ? STALL_RETRY_DELAY : base;
+      const delay = downFor() > STALL_AFTER ? STALL_RETRY_DELAY : base;
       rejoinTimerRef.current = setTimeout(() => reconnectRef.current?.(next), delay);
     };
 
@@ -615,8 +617,6 @@ export function useWebRTC() {
       );
       if (!res.ok) throw new Error(`status ${res.status}`);
       log('rejoining room');
-      rejoinStartRef.current = null;
-      setRejoinStalled(false);
       connectRef.current?.(code, alias);
     } catch (e) {
       log(`rejoin failed (${e.message}); retrying`);
@@ -626,6 +626,15 @@ export function useWebRTC() {
   }, [log, rejoinStalled]);
 
   reconnectRef.current = reconnectToPeer;
+
+  // The way back from the give-up state: wipe the down-clock and start the ladder over.
+  const retryConnection = useCallback(() => {
+    clearTimeout(rejoinTimerRef.current);
+    rejoinStartRef.current = null;
+    setRejoinStalled(false);
+    setRejoinGaveUp(false);
+    reconnectRef.current?.(1);
+  }, []);
 
   const createPeerConnection = useCallback((peerId, isOfferer) => {
     const existing = peersRef.current[peerId];
@@ -735,6 +744,9 @@ export function useWebRTC() {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      rejoinStartRef.current = null;
+      setRejoinStalled(false);
+      setRejoinGaveUp(false);
       setSignaling('open');
       log('signaling connected');
     };
@@ -904,6 +916,7 @@ export function useWebRTC() {
     clearTimeout(rejoinTimerRef.current);
     rejoinStartRef.current = null;
     setRejoinStalled(false);
+    setRejoinGaveUp(false);
 
     if (persist) {
       Object.entries(incommingRef.current).forEach(([peerId, files]) => {
@@ -1384,5 +1397,5 @@ export function useWebRTC() {
     return () => window.removeEventListener('beforeunload', onUnload);
   }, []);
 
-  return { peers, signaling, roomCode, selfId, messages, logs, transfers, createRoom, joinRoom, leaveRoom, persist, setPersist, sendMessage, sendFile, acceptFile, resumable, resumeBusy, availableMatches, resumeTransfer, discardTransfer, natType, rejoinStalled };
+  return { peers, signaling, roomCode, selfId, messages, logs, transfers, createRoom, joinRoom, leaveRoom, persist, setPersist, sendMessage, sendFile, acceptFile, resumable, resumeBusy, availableMatches, resumeTransfer, discardTransfer, natType, rejoinStalled, rejoinGaveUp, retryConnection };
 }

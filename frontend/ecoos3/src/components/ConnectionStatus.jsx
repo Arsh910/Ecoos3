@@ -17,35 +17,41 @@ function useOnline() {
   return online;
 }
 
+const saved = (activeTransfer) => (activeTransfer ? ' Your progress is saved.' : '');
+
 // Most specific cause first: being offline explains a stall better than a failing rejoin does.
-function describe({ online, rejoinStalled, activeTransfer }) {
+function describe({ online, rejoinStalled, rejoinGaveUp, activeTransfer }) {
   if (!online) {
-    return { icon: 'plug', text: 'You’re offline — the transfer continues when you reconnect.' };
+    return { icon: 'plug', text: `You’re offline — reconnecting as soon as this device is back on a network.${saved(activeTransfer)}` };
+  }
+  if (rejoinGaveUp) {
+    return { icon: 'plug', retry: true, text: `Couldn’t reach the server, so we’ve stopped trying.${saved(activeTransfer)}` };
   }
   if (rejoinStalled) {
-    return { icon: 'spinner', text: 'Still trying to reach the server — your progress is saved, and refreshing is safe.' };
+    return { icon: 'spinner', retry: true, text: `Still trying to reach the server — refreshing is safe.${saved(activeTransfer)}` };
   }
-  if (activeTransfer) {
-    return { icon: 'spinner', text: 'Reconnecting — your progress is saved.' };
-  }
-  // The hook only rejoins on its own while a transfer is in flight.
-  return { icon: 'plug', text: 'Disconnected from the server — rejoin the room to reconnect.' };
+  return { icon: 'spinner', text: `Reconnecting…${saved(activeTransfer)}` };
 }
 
-export function ConnectionStatus({ signaling, roomCode, rejoinStalled, activeTransfer }) {
+export function ConnectionStatus({ signaling, roomCode, rejoinStalled, rejoinGaveUp, activeTransfer, onRetry }) {
   const online = useOnline();
 
   if (!roomCode) return null;
 
   const disconnected = signaling === 'closed' || signaling === 'error';
-  if (online && !disconnected && !rejoinStalled) return null;
+  if (online && !disconnected && !rejoinStalled && !rejoinGaveUp) return null;
 
-  const { icon, text } = describe({ online, rejoinStalled, activeTransfer });
+  const { icon, text, retry } = describe({ online, rejoinStalled, rejoinGaveUp, activeTransfer });
 
   return (
-    <p className="notice" role="status">
+    <div className="notice" role="status">
       <Icon name={icon} size={14} className={icon === 'spinner' ? 'icon-spin' : undefined} />
-      {text}
-    </p>
+      <span className="notice__text">{text}</span>
+      {retry && online && (
+        <button type="button" className="btn btn--sm" onClick={onRetry}>
+          Retry now
+        </button>
+      )}
+    </div>
   );
 }

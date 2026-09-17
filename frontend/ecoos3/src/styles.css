@@ -135,6 +135,10 @@ textarea {
   color: var(--pending);
 }
 
+.notice__text {
+  flex: 1;
+}
+
 .banner {
   display: flex;
   align-items: flex-start;
