@@ -45,6 +45,7 @@ type RoomManger struct {
 func (p *Peer) Send(v any) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	return p.Conn.WriteJSON(v)
 }
 
@@ -237,13 +238,20 @@ func (r *Room) RouteTo(targetID string, msg []byte) {
 	r.mu.Unlock()
 
 	if !ok {
+		log.Println("route: no such peer", targetID)
 		return
 	}
 
 	target.mu.Lock()
-	defer target.mu.Unlock()
 
-	target.Conn.WriteMessage(websocket.TextMessage, msg)
+	target.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	err := target.Conn.WriteMessage(websocket.TextMessage, msg)
+
+	if err != nil {
+		log.Println("route failed to", targetID, err)
+	}
+
+	target.mu.Unlock()
 }
 
 func (r *Room) LeaveRoom(peerId string, conn *websocket.Conn) {

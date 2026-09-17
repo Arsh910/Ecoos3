@@ -406,11 +406,13 @@ export function useWebRTC() {
     if (!state?.writable) return;
 
     // The file channel is unordered, so every chunk must name its own offset.
-    await state.writable.write({
-      type: 'write',
-      position: index * state.meta.chunkSize,
-      data: chunckData,
-    })
+    state.writeChain = (state.writeChain || Promise.resolve())
+      .then(() => state.writable.write({
+        type: 'write',
+        position: index * state.meta.chunkSize,
+        data: chunckData,
+      }));
+    await state.writeChain;
 
     if (!hasBit(state.bitmap, index)) {
       setBit(state.bitmap, index);

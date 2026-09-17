@@ -124,6 +124,7 @@ func (app *application) handleJoinRoom(c *gin.Context) {
 			select {
 			case <-ticker.C:
 				if err := peer.Ping(); err != nil {
+					log.Println("ping failed, stopping keepalive for", peer.ID, err)
 					return
 				}
 			case <-done:
