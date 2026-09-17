@@ -24,7 +24,7 @@ const loadPersist = () => localStorage.getItem('ecoos3-persist') !== 'off';
 
 export function useWebRTC() {
   const [peers, setPeers] = useState([]); // [{ id, state }]
-  const [signaling, setSignaling] = useState('connecting');
+  const [signaling, setSignaling] = useState('idle');
   const [roomCode, setRoomCode] = useState(null);
   const [selfId, setSelfId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -49,7 +49,7 @@ export function useWebRTC() {
   const connectRef = useRef(null);
   const roomRef = useRef({ code: null, alias: null });
   const reconnectRef = useRef(null);
-  const createPcRef = useRef(null);
+  const rejoinTimerRef = useRef(null);
 
   const log = useCallback((msg) => {
     setLogs((prev) => [...prev, msg]);
@@ -566,56 +566,49 @@ export function useWebRTC() {
     return local ?? null;
   }, [log]);
 
-  const reconnectToPeer = useCallback(async (peerId, attempt = 1) => {
+  const reconnectToPeer = useCallback(async (attempt = 1) => {
+    clearTimeout(rejoinTimerRef.current);
     const ws = wsRef.current;
 
-    if (ws?.readyState === WebSocket.OPEN) {
-      log(`rebuilding connection to ${nameOf(peerMetaRef, peerId)}`);
-      peersRef.current[peerId]?.pc.close();
-      delete peersRef.current[peerId];
-      createPcRef.current?.(peerId, shouldOffer(selfIdRef.current, peerId));
-      return;
-    }
+    if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) return;
 
-    if (ws?.readyState === WebSocket.CONNECTING) return;
+    const anyTransfer =
+      Object.values(incommingRef.current).some((files) =>
+        Object.values(files).some((s) => !s.finalizing)) ||
+      Object.keys(sendingRef.current).length > 0;
 
-    if (!navigator.onLine) {
-      log('offline; waiting for network');
-      return;
-    }
+    if (!anyTransfer) return;
 
     const { code, alias } = roomRef.current;
     if (!code) return;
 
-    try {
-      const res = await fetch(`${BASE_API_URL}/room/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
-        signal: AbortSignal.timeout(60000),
-      });
-      if (!res.ok) throw new Error(`status ${res.status}`);
-      log('reconnecting');
-      connectRef.current?.(code, alias);
-    } 
-    catch (e) {
-      if (attempt >= 6) { log(`rejoin gave up: ${e.message}`); return; }  
-      const delay = Math.min(1000 * 2 ** (attempt - 1), 30000);
-      log(`rejoin failed (${e.message}), retrying in ${delay / 1000}s`);
-      setTimeout(() => reconnectRef.current?.(peerId, attempt + 1), delay);
-    
+    const retry = (next) => {
+      const delay = Math.min(1000 * 2 ** (next - 2), 15000);
+      rejoinTimerRef.current = setTimeout(() => reconnectRef.current?.(next), delay);
+    };
+
+    if (!navigator.onLine) {
+      log('offline; waiting for network');
+      rejoinTimerRef.current = setTimeout(() => reconnectRef.current?.(attempt), 5000);
+      return;
     }
+
+    try {
+      const res = await fetch(
+        `${BASE_API_URL}/room/create?code=${encodeURIComponent(code)}`,
+        { method: 'POST' }
+      );
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      log('rejoining room');
+      connectRef.current?.(code, alias);
+    } catch (e) {
+      log(`rejoin failed (${e.message}); retrying`);
+      retry(attempt + 1);
+    }
+
   }, [log]);
 
   reconnectRef.current = reconnectToPeer;
-
-  const hasTransferWith = useCallback((peerId) => {
-    const receiving = Object.values(incommingRef.current[peerId] || {})
-      .some((s) => !s.finalizing);
-    const sending = Object.keys(sendingRef.current)
-      .some((k) => k.startsWith(`${peerId}:`));
-    return receiving || sending;
-  }, []);
 
   const createPeerConnection = useCallback((peerId, isOfferer) => {
     const existing = peersRef.current[peerId];
@@ -641,7 +634,7 @@ export function useWebRTC() {
       );
             
       if (pc.connectionState === 'connected') reportConnectionType(peerId).catch(() => { });
-      if (pc.connectionState === 'failed' && hasTransferWith(peerId)) {
+      if (pc.connectionState === 'failed') {
         log(`connection to ${nameOf(peerMetaRef, peerId)} failed;`);
         
         Object.entries(incommingRef.current[peerId] || {}).forEach(([fileId, s]) => {
@@ -654,7 +647,7 @@ export function useWebRTC() {
           }
         });
 
-        reconnectToPeer(peerId).catch((e) => log(`reconnect error: ${e.message}`));
+        reconnectToPeer().catch((e) => log(`reconnect error: ${e.message}`));
       }
     }
 
@@ -702,9 +695,7 @@ export function useWebRTC() {
 
     return entry;
 
-  }, [log, handleControlMessage, handleFileChunck, announceResumable, reportConnectionType, updateTransfer, reconnectToPeer, hasTransferWith]);
-
-  createPcRef.current = createPeerConnection;
+  }, [log, handleControlMessage, handleFileChunck, announceResumable, reportConnectionType, updateTransfer]);
 
   const connectToRoom = useCallback((code, alias) => {
     roomRef.current = { code, alias };
@@ -728,18 +719,7 @@ export function useWebRTC() {
     ws.onclose = () => {
       setSignaling('closed');
       log('signaling closed');
-
-      const anyTransfer =
-        Object.values(incommingRef.current).some((files) =>
-          Object.values(files).some((s) => !s.finalizing)) ||
-        Object.keys(sendingRef.current).length > 0;
-
-      if (!anyTransfer) return;
-      if (!roomRef.current.code) return;
-      if (!navigator.onLine) return;
-
-      log('signaling dropped during transfer; rejoining');
-      setTimeout(() => reconnectRef.current?.(null, 1), 2000);
+      reconnectRef.current?.(1);
     };
 
     ws.onerror = () => {
@@ -1010,7 +990,7 @@ export function useWebRTC() {
     const control = entry?.control;
     const fileChannel = entry?.fileChannel;
 
-    if (!control || !fileChannel || fileChannel.readyState != 'open') {
+    if (!control || !fileChannel || fileChannel.readyState !== 'open') {
       log('channels are not ready');
       return;
     }
@@ -1362,11 +1342,8 @@ export function useWebRTC() {
   // reconnect on online
   useEffect(() => {
     const onOnline = () => {
-      if (!navigator.onLine) return;
-      if (!roomRef.current.code) return;
-      if (wsRef.current?.readyState === WebSocket.OPEN) return;
-      log('network back; reconnecting');
-      reconnectRef.current?.(null, 1);
+      clearTimeout(rejoinTimerRef.current);
+      reconnectRef.current?.(1);
     };
     window.addEventListener('online', onOnline);
     return () => window.removeEventListener('online', onOnline);
