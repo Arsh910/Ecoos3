@@ -52,7 +52,8 @@ export function useWebRTC() {
   const rejoinTimerRef = useRef(null);
 
   const log = useCallback((msg) => {
-    setLogs((prev) => [...prev, msg]);
+    const t = new Date().toLocaleTimeString();
+    setLogs((prev) => [...prev, `${t} ${msg}`]);
   }, []);
 
   const setPersist = useCallback((on) => {
@@ -682,9 +683,15 @@ export function useWebRTC() {
 
       pc.createOffer()
         .then((offer) => pc.setLocalDescription(offer).then(() => offer))
-        .then((offer) => wsRef.current.send(JSON.stringify({
-          type: 'offer', to: peerId, sdp: offer,
-        })));
+        .then((offer) => {
+          if (wsRef.current?.readyState !== WebSocket.OPEN) {
+            log(`offer to ${nameOf(peerMetaRef, peerId)} dropped: socket not open`);
+            return;
+          }
+          log(`sending offer to ${nameOf(peerMetaRef, peerId)}`);
+          wsRef.current.send(JSON.stringify({ type: 'offer', to: peerId, sdp: offer }));
+        })
+        .catch((e) => log(`offer failed: ${e.message}`));
 
     } else {
       pc.ondatachannel = (event) => {
