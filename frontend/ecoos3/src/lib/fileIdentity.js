@@ -26,3 +26,7 @@ export async function computeTransferId(file) {
     .join('');
 
 }
+
+export function fileKey(transferId) {
+  return parseInt(transferId.slice(0, 8), 16) >>> 0;
+}

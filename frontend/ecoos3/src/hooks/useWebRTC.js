@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 import { hasFSA } from '../lib/capabilities'
 import { peerLabel } from '../lib/format'
 import { getPeerId } from '../lib/identity'
-import { computeTransferId } from '../lib/fileIdentity'
+import { computeTransferId, fileKey } from '../lib/fileIdentity'
 import { ensureReadPermission, isHandle } from '../lib/filePicker'
 import { createBitmap, hasBit, setBit, countBits, missingChunks } from '../lib/bitmap'
 import { saveTransfer, patchTransfer, deleteTransfer, listTransfers, pruneOld } from '../lib/transferStore'
@@ -394,14 +394,15 @@ export function useWebRTC() {
 
   const handleFileChunck = useCallback(async (peerId, buffer) => {
     const view = new DataView(buffer);
-    const index = view.getUint32(0);
-    const chunckData = buffer.slice(4);
+    const key = view.getUint32(0);
+    const index = view.getUint32(4);
+    const chunckData = buffer.slice(8);
 
 
     const peerFiles = incommingRef.current[peerId];
     if (!peerFiles) return;
 
-    const fileId = Object.keys(peerFiles)[0];
+    const fileId = Object.keys(peerFiles).find((id)=> fileKey(id) === key);
     if (!fileId) return;
 
     const state = peerFiles[fileId];
@@ -1106,11 +1107,15 @@ export function useWebRTC() {
     let leftover = new Uint8Array(0);
 
     const sendChunk = (bytes, idx) => {
-      const header = new ArrayBuffer(4);
-      new DataView(header).setUint32(0, idx);
-      const payload = new Uint8Array(4 + bytes.length);
+      const key = fileKey(fileId);
+      const header = new ArrayBuffer(8);
+      const view = new DataView(header);
+      view.setUint32(0, key);
+      view.setUint32(4,idx);
+
+      const payload = new Uint8Array(8 + bytes.length);
       payload.set(new Uint8Array(header), 0);
-      payload.set(bytes, 4);
+      payload.set(bytes, 8);
       fileChannel.send(payload.buffer);
     }
 
