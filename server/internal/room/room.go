@@ -238,18 +238,13 @@ func (r *Room) RouteTo(targetID string, msg []byte) {
 	r.mu.Unlock()
 
 	if !ok {
-		log.Println("route: no such peer", targetID)
 		return
 	}
 
 	target.mu.Lock()
 
 	target.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	err := target.Conn.WriteMessage(websocket.TextMessage, msg)
-
-	if err != nil {
-		log.Println("route failed to", targetID, err)
-	}
+	target.Conn.WriteMessage(websocket.TextMessage, msg)
 
 	target.mu.Unlock()
 }
