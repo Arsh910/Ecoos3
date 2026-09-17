@@ -54,6 +54,7 @@ export function useWebRTC() {
   const reconnectRef = useRef(null);
   const rejoinTimerRef = useRef(null);
   const rejoinStartRef = useRef(null);
+  const rejoinAttemptRef = useRef(0);
 
   const log = useCallback((msg) => {
     const t = new Date().toLocaleTimeString();
@@ -735,14 +736,22 @@ export function useWebRTC() {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      rejoinAttemptRef.current = 0;
+      rejoinStartRef.current = null;
+      setRejoinStalled(false);
       setSignaling('open');
       log('signaling connected');
     };
 
     ws.onclose = () => {
+      log(`signaling closed (code ${event.code}${event.reason ? ': ' + event.reason : ''})`);
       setSignaling('closed');
       log('signaling closed');
-      reconnectRef.current?.(1);
+      
+      const n = (rejoinAttemptRef.current += 1);
+      const delay = Math.min(1000 * 2 ** Math.min(n - 1, 5), 30000);
+      clearTimeout(rejoinTimerRef.current);
+      rejoinTimerRef.current = setTimeout(() => reconnectRef.current?.(), delay);
     };
 
     ws.onerror = () => {
