@@ -39,6 +39,8 @@ without email limits, cloud accounts, or a USB stick.
 - 📡 **Direct transfers** — files stream browser-to-browser, never through a server
 - ♾️ **No size limit** — files are written straight to disk as they arrive, not held in memory
 - ⏯️ **Resume anytime** — an interrupted transfer picks up where it stopped, even days later
+- 🔁 **Reconnects itself** — a dropped connection is retried in the background, with a banner
+  telling you whether it's still trying or has given up
 - 🚪 **Leave and come back** — leave a room and keep your progress, or discard it
 - 👥 **Up to 4 people per room** — everyone connects to everyone, not through a host
 - 🎯 **Pick your recipients** — send to the whole room, or select just the people you want
@@ -99,6 +101,23 @@ meantime, you're told so instead of ending up with a mix of two files.
 > The sender's percentage under **Unfinished transfers** is the last progress the receiver
 > reported, so it can trail the receiver's by a few seconds of transfer. It catches up as soon
 > as you reconnect, and resuming always goes by what the receiver actually has.
+
+## When the connection drops
+
+Staying in a room is enough — if the connection to the signalling server drops, ecoos3 retries
+on its own, and there's nothing to click. A banner at the top of the page says where things
+stand:
+
+- **Reconnecting** — the drop just happened and is being retried. Short blips clear by
+  themselves and you'll rarely see more than this
+- **Disconnected** — still out of reach after a couple of minutes. Retries carry on, spaced
+  further apart. Refreshing the page is safe
+- **Failed** — out of reach for six minutes, so retrying stops. Connect using a new room and
+  resume from **Unfinished transfers**
+
+Your progress is kept throughout, so a reconnect never costs you what has already transferred.
+Remember that files move directly between browsers: once a transfer is running, the signalling
+server is only needed again if the two of you have to find each other afresh.
 
 ## Browser support
 
