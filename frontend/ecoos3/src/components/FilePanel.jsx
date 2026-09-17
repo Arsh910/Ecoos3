@@ -1,8 +1,28 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Icon } from './Icon';
 import { formatBytes, peerLabel } from '../lib/format';
 import { hasFSA, hasOpenPicker, canPersistTransfers } from '../lib/capabilities';
 import { pickFiles } from '../lib/filePicker';
+
+const PHASE = { active: 0, pending: 1, done: 2 };
+const phaseOf = (t) => (t.done ? 'done' : t.accepted ? 'active' : 'pending');
+
+const movedChunks = (t) =>
+  (t.done ? t.total : (t.direction === 'receiving' ? t.received : t.sent)) ?? 0;
+
+function summarize(entries) {
+  let chunks = 0;
+  let moved = 0;
+  let size = 0;
+
+  entries.forEach(([, t]) => {
+    chunks += t.total ?? 0;
+    moved += movedChunks(t);
+    size += t.size ?? 0;
+  });
+
+  return { size, count: entries.length, pct: chunks ? Math.round((moved / chunks) * 100) : 0 };
+}
 
 function status(transfer, incoming) {
   if (transfer.done) return 'Complete';
@@ -82,36 +102,50 @@ function Transfer({ transfer, onAccept }) {
   );
 }
 
-export function FilePanel({ transfers, onSend, onAccept, targetCount, persist, disabled }) {
+export function FilePanel({ transfers, onSend, onAccept, onAcceptAll, targetCount, persist, disabled }) {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
-  const items = Object.entries(transfers);
+
+  const items = useMemo(
+    () => Object.entries(transfers)
+      .sort(([, a], [, b]) => PHASE[phaseOf(a)] - PHASE[phaseOf(b)]),
+    [transfers],
+  );
+
+  // One group per peer, in the order their first transfer appears.
+  const groups = useMemo(() => {
+    const byPeer = new Map();
+    items.forEach((entry) => {
+      const { peerId } = entry[1];
+      if (!byPeer.has(peerId)) byPeer.set(peerId, []);
+      byPeer.get(peerId).push(entry);
+    });
+    return [...byPeer.entries()];
+  }, [items]);
+
+  const summary = useMemo(() => summarize(items), [items]);
+  const pendingIn = items.filter(([, t]) => t.direction === 'receiving' && !t.accepted).length;
 
   const handleDrop = async (event) => {
     event.preventDefault();
     setDragging(false);
     if (disabled) return;
 
-    const item = event.dataTransfer.items?.[0];
-    const droppedFile = event.dataTransfer.files?.[0];
+    // dataTransfer empties when this handler returns, so read it all before any await.
+    const entries = [...(event.dataTransfer.items ?? [])].filter((i) => i.kind === 'file');
+    const files = [...(event.dataTransfer.files ?? [])];
+    const requests = entries.map((i) => i.getAsFileSystemHandle?.());
 
-    if (!item || item.kind !== 'file') return;
+    const handles = (await Promise.all(requests)).filter((h) => h?.kind === 'file');
 
-    if (typeof item.getAsFileSystemHandle === 'function') {
-      const handle = await item.getAsFileSystemHandle();
-      if (handle?.kind === 'file') onSend(handle);
-      return;
-    }
-
-    // No handle support: send the plain File (it can't be resumed after a refresh).
-    if (droppedFile) onSend(droppedFile);
+    // No handle support: send the plain Files (they can't be resumed after a refresh).
+    onSend(handles.length > 0 ? handles : files);
   };
 
   const choose = async () => {
     if (disabled) return;
     if (hasOpenPicker) {
-      const [handle] = await pickFiles();
-      if (handle) onSend(handle);
+      onSend(await pickFiles({ multiple: true }));
     }
     else {
       inputRef.current?.click();
@@ -153,15 +187,15 @@ export function FilePanel({ transfers, onSend, onAccept, targetCount, persist, d
           disabled={disabled}
         >
           <Icon name="upload" />
-          Select file
+          Select files
         </button>
         <input
           ref={inputRef}
           type="file"
+          multiple
           className="sr-only"
           onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) onSend(file);
+            onSend([...event.target.files]);
             event.target.value = '';
           }}
         />
@@ -190,14 +224,42 @@ export function FilePanel({ transfers, onSend, onAccept, targetCount, persist, d
               <span className="empty__title">No transfers yet</span>
               <span className="empty__hint">
                 {hasFSA
-                  ? 'Drop a file here or use Select file'
-                  : 'Drop a file here to send — incoming files can’t be saved in this browser'}
+                  ? 'Drop files here or use Select files'
+                  : 'Drop files here to send — incoming files can’t be saved in this browser'}
               </span>
             </div>
           ) : (
-            items.map(([key, transfer]) => (
-              <Transfer key={key} transfer={transfer} onAccept={onAccept} />
-            ))
+            <>
+              {items.length > 1 && (
+                <div className="tsummary">
+                  <span className="tsummary__text">
+                    {summary.count} files · {formatBytes(summary.size)} · {summary.pct}% overall
+                  </span>
+                  {pendingIn > 1 && (
+                    <button
+                      type="button"
+                      className="btn btn--sm btn--primary"
+                      onClick={onAcceptAll}
+                      disabled={!hasFSA}
+                      title={hasFSA ? 'Choose one folder for every incoming file' : 'Requires a Chromium browser'}
+                    >
+                      Accept all ({pendingIn})
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {groups.map(([peerId, entries]) => (
+                <div key={peerId}>
+                  {groups.length > 1 && (
+                    <p className="tgroup">{peerLabel(peerId, entries[0][1].peerAlias)}</p>
+                  )}
+                  {entries.map(([key, transfer]) => (
+                    <Transfer key={key} transfer={transfer} onAccept={onAccept} />
+                  ))}
+                </div>
+              ))}
+            </>
           )}
         </div>
       </div>

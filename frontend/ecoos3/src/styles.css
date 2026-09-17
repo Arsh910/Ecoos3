@@ -816,6 +816,36 @@ textarea {
   margin-top: 8px;
 }
 
+/* batch header above the transfer rows */
+.tsummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tsummary__text {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.tgroup {
+  margin: 16px 0 8px;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tgroup:first-child {
+  margin-top: 0;
+}
+
 .transfer__row {
   display: flex;
   align-items: center;

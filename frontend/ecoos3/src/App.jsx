@@ -32,6 +32,7 @@ function App() {
     sendMessage,
     sendFile,
     acceptFile,
+    acceptAllFiles,
     resumable,
     resumeBusy,
     availableMatches,
@@ -126,8 +127,9 @@ function App() {
         />
         <FilePanel
           transfers={transfers}
-          onSend={(source) => sendFile(source, targets)}
+          onSend={(sources) => sources.forEach((s) => sendFile(s, targets))}
           onAccept={acceptFile}
+          onAcceptAll={acceptAllFiles}
           persist={persist}
           targetCount={targets.length}
           disabled={offline}

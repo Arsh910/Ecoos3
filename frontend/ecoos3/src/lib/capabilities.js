@@ -4,4 +4,6 @@ export const hasFSA = typeof window !== 'undefined' && 'showSaveFilePicker' in w
 
 export const hasOpenPicker = typeof window !== 'undefined' && 'showOpenFilePicker' in window;
 
+export const hasDirectoryPicker = typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+
 export const canPersistTransfers = hasFSA && hasOpenPicker;

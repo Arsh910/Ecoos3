@@ -1,9 +1,9 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
-import { hasFSA } from '../lib/capabilities'
+import { hasFSA, hasDirectoryPicker } from '../lib/capabilities'
 import { peerLabel } from '../lib/format'
 import { getPeerId } from '../lib/identity'
 import { computeTransferId, fileKey } from '../lib/fileIdentity'
-import { ensureReadPermission, isHandle } from '../lib/filePicker'
+import { ensureReadPermission, isHandle, pickDirectory, uniqueFileName } from '../lib/filePicker'
 import { createBitmap, hasBit, setBit, countBits, missingChunks } from '../lib/bitmap'
 import { saveTransfer, patchTransfer, deleteTransfer, listTransfers, pruneOld } from '../lib/transferStore'
 import { loadResumable, grantPermission } from '../lib/resume';
@@ -944,23 +944,9 @@ export function useWebRTC() {
 
   }, [log, updateTransfer, persist, refreshResumable]);
 
-  // Called straight from a button click.
-  const acceptFile = useCallback(async (peerId, fileId) => {
+  const attachHandle = useCallback(async (peerId, fileId, handle) => {
     const state = incommingRef.current[peerId]?.[fileId];
     if (!state || state.accepted) return;
-
-    if (!hasFSA) {
-      log('this browser cannot stream files to disk (needs the File System Access API)');
-      return;
-    }
-
-    let handle;
-    try {
-      handle = await window.showSaveFilePicker({ suggestedName: state.meta.name });
-    } catch {
-      log(`save cancelled: ${state.meta.name}`);
-      return;
-    }
 
     state.handle = handle;
     state.writable = await handle.createWritable({ keepExistingData: true });
@@ -990,6 +976,73 @@ export function useWebRTC() {
     peersRef.current[peerId]?.control?.send(JSON.stringify({ type: 'file-accept', fileId, resumable }));
     log(`accepted from ${nameOf(peerMetaRef, peerId)}: ${state.meta.name}`);
   }, [log, updateTransfer, persist]);
+
+  // Called straight from a button click.
+  const acceptFile = useCallback(async (peerId, fileId) => {
+    const state = incommingRef.current[peerId]?.[fileId];
+    if (!state || state.accepted) return;
+
+    if (!hasFSA) {
+      log('this browser cannot stream files to disk (needs the File System Access API)');
+      return;
+    }
+
+    let handle;
+    try {
+      handle = await window.showSaveFilePicker({ suggestedName: state.meta.name });
+    } catch {
+      log(`save cancelled: ${state.meta.name}`);
+      return;
+    }
+
+    await attachHandle(peerId, fileId, handle);
+  }, [log, attachHandle]);
+
+  const pendingOffers = () => {
+    const pending = [];
+    Object.entries(incommingRef.current).forEach(([peerId, files]) => {
+      Object.entries(files).forEach(([fileId, state]) => {
+        if (!state.accepted) pending.push({ peerId, fileId, state });
+      });
+    });
+    return pending;
+  };
+
+  // One folder for the batch. Without showDirectoryPicker it falls back to one Save
+  // dialog per file — still N prompts, but the user only makes the decision once.
+  const acceptAllFiles = useCallback(async () => {
+    if (!hasFSA) {
+      log('this browser cannot stream files to disk (needs the File System Access API)');
+      return;
+    }
+
+    const pending = pendingOffers();
+    if (pending.length === 0) return;
+
+    if (!hasDirectoryPicker) {
+      for (const { peerId, fileId } of pending) await acceptFile(peerId, fileId);
+      return;
+    }
+
+    const dir = await pickDirectory();
+    if (!dir) {
+      log('folder selection cancelled');
+      return;
+    }
+
+    log(`saving ${pending.length} file(s) into ${dir.name}`);
+
+    const taken = new Set();
+    for (const { peerId, fileId, state } of pending) {
+      try {
+        const name = await uniqueFileName(dir, state.meta.name, taken);
+        taken.add(name);
+        await attachHandle(peerId, fileId, await dir.getFileHandle(name, { create: true }));
+      } catch (e) {
+        log(`could not save ${state.meta.name}: ${e.message}`);
+      }
+    }
+  }, [log, acceptFile, attachHandle]);
 
   const sendMessage = useCallback((text, targetIds) => {
     const targets = targetIds?.length ? targetIds : Object.keys(peersRef.current);
@@ -1388,5 +1441,5 @@ export function useWebRTC() {
     return () => window.removeEventListener('beforeunload', onUnload);
   }, []);
 
-  return { peers, signaling, roomCode, selfId, messages, logs, transfers, createRoom, joinRoom, leaveRoom, persist, setPersist, sendMessage, sendFile, acceptFile, resumable, resumeBusy, availableMatches, resumeTransfer, discardTransfer, natType, rejoinStalled };
+  return { peers, signaling, roomCode, selfId, messages, logs, transfers, createRoom, joinRoom, leaveRoom, persist, setPersist, sendMessage, sendFile, acceptFile, acceptAllFiles, resumable, resumeBusy, availableMatches, resumeTransfer, discardTransfer, natType, rejoinStalled };
 }
