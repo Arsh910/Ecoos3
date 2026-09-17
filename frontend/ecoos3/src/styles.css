@@ -135,10 +135,6 @@ textarea {
   color: var(--pending);
 }
 
-.notice__text {
-  flex: 1;
-}
-
 .banner {
   display: flex;
   align-items: flex-start;
@@ -153,6 +149,16 @@ textarea {
 .banner--warn {
   background: #d9a44114;
   border: 1px solid #d9a44133;
+}
+
+/* terminal states, where retrying has stopped */
+.banner--err {
+  background: #e5606a14;
+  border: 1px solid #e5606a33;
+}
+
+.banner--err > svg {
+  color: var(--err);
 }
 
 .banner > svg {

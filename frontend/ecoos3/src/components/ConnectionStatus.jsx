@@ -17,41 +17,45 @@ function useOnline() {
   return online;
 }
 
-const saved = (activeTransfer) => (activeTransfer ? ' Your progress is saved.' : '');
-
-// Most specific cause first: being offline explains a stall better than a failing rejoin does.
 function describe({ online, rejoinStalled, rejoinGaveUp, activeTransfer }) {
-  if (!online) {
-    return { icon: 'plug', text: `You’re offline — reconnecting as soon as this device is back on a network.${saved(activeTransfer)}` };
-  }
+  const saved = activeTransfer ? ' Your progress is saved.' : '';
+
   if (rejoinGaveUp) {
-    return { icon: 'plug', retry: true, text: `Couldn’t reach the server, so we’ve stopped trying.${saved(activeTransfer)}` };
+    return {tone: 'err', icon: 'alert', label: 'Failed',
+      detail: `Couldn’t reach the server.${saved} Connect using a new room and resume.`,
+    };
+  }
+  if (!online) {
+    return {tone: 'warn', icon: 'plug', label: 'Disconnected',
+      detail: `This device is offline. Reconnecting as soon as it is back on a network.${saved}`,
+    };
   }
   if (rejoinStalled) {
-    return { icon: 'spinner', retry: true, text: `Still trying to reach the server — refreshing is safe.${saved(activeTransfer)}` };
+    return {tone: 'warn', icon: 'plug', label: 'Disconnected',
+      detail: `Still trying to reach the server.${saved} Refreshing is safe.`,
+    };
   }
-  return { icon: 'spinner', text: `Reconnecting…${saved(activeTransfer)}` };
+  return {tone: 'warn', icon: 'spinner', label: 'Reconnecting', detail: `Trying to reach the server again.${saved}`,
+  };
 }
 
-export function ConnectionStatus({ signaling, roomCode, rejoinStalled, rejoinGaveUp, activeTransfer, onRetry }) {
+export function ConnectionStatus({ signaling, roomCode, rejoinStalled, rejoinGaveUp, activeTransfer }) {
   const online = useOnline();
 
   if (!roomCode) return null;
 
-  const disconnected = signaling === 'closed' || signaling === 'error';
-  if (online && !disconnected && !rejoinStalled && !rejoinGaveUp) return null;
+  const dropped = signaling === 'closed' || signaling === 'error';
+  if (online && !dropped && !rejoinStalled && !rejoinGaveUp) return null;
 
-  const { icon, text, retry } = describe({ online, rejoinStalled, rejoinGaveUp, activeTransfer });
+  const { tone, icon, label, detail } = describe({ online, rejoinStalled, rejoinGaveUp, activeTransfer });
 
   return (
-    <div className="notice" role="status">
+    <div className={`banner banner--${tone}`} role="status">
       <Icon name={icon} size={14} className={icon === 'spinner' ? 'icon-spin' : undefined} />
-      <span className="notice__text">{text}</span>
-      {retry && online && (
-        <button type="button" className="btn btn--sm" onClick={onRetry}>
-          Retry now
-        </button>
-      )}
+      <div>
+        <strong>{label}</strong>
+        <p>{detail}</p>
+      </div>
     </div>
   );
 }

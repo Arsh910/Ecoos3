@@ -40,7 +40,6 @@ function App() {
     discardTransfer,
     rejoinStalled,
     rejoinGaveUp,
-    retryConnection,
   } = useWebRTC();
 
   const [selected, setSelected] = useState([]);
@@ -86,7 +85,7 @@ function App() {
         <Identity alias={alias} onAlias={setAlias} selfId={selfId} />
       </header>
 
-      <ConnectionStatus signaling={signaling} roomCode={roomCode} rejoinStalled={rejoinStalled} rejoinGaveUp={rejoinGaveUp} activeTransfer={activeTransfer} onRetry={retryConnection} />
+      <ConnectionStatus signaling={signaling} roomCode={roomCode} rejoinStalled={rejoinStalled} rejoinGaveUp={rejoinGaveUp} activeTransfer={activeTransfer} />
 
       {!hasFSA && (
         <p className="notice">

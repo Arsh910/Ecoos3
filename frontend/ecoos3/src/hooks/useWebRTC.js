@@ -15,7 +15,7 @@ const BASE_API_URL = import.meta.env.VITE_API_URL
 const CHUNK_SIZE = 64 * 1024;
 const STALL_AFTER = 2 * 60 * 1000;      // keep retrying past this, just slower, and say so
 const STALL_RETRY_DELAY = 30 * 1000;
-const GIVE_UP_AFTER = 10 * 60 * 1000;   // past this, stop on our own and wait to be asked
+const GIVE_UP_AFTER = 6 * 60 * 1000;    // long enough that a brief network wobble never reaches it
 const BUFFER_LOW_THRESHOLD = CHUNK_SIZE * 4;
 const PREVIEWABLE = /^(image|video|audio|text)\/|^application\/pdf$/;
 const tkey = (peerId, fileId) => `${peerId}:${fileId}`;
