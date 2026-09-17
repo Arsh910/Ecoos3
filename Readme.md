@@ -4,6 +4,9 @@
 
 **Share text and files directly between browsers — no uploads, no accounts, no size limit.**
 
+### [ecoos3.duckdns.org](https://ecoos3.duckdns.org)
+
+[![Live](https://img.shields.io/badge/Live-ecoos3.duckdns.org-F25A5C?style=flat-square&logo=googlechrome&logoColor=white)](https://ecoos3.duckdns.org)
 [![WebRTC](https://img.shields.io/badge/WebRTC-Data_Channels-333333?style=flat-square&logo=webrtc&logoColor=white)](https://webrtc.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev/)
@@ -134,7 +137,9 @@ a public STUN server and no relay fallback.
 
 ## Running it locally
 
-You'll need [Go](https://go.dev/) and [Node.js](https://nodejs.org/).
+The hosted app is at [ecoos3.duckdns.org](https://ecoos3.duckdns.org) if you'd rather not run
+your own. To build it yourself you'll need [Go](https://go.dev/) and
+[Node.js](https://nodejs.org/).
 
 ```bash
 # signalling server — http://localhost:8080
