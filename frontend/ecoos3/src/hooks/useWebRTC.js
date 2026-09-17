@@ -777,7 +777,7 @@ export function useWebRTC() {
           setSelfId(msg.self);
         }
 
-        setPeers(msg.peers.map((p) => ({ id: p.id, alias: p.alias, state: 'new' })));
+        setPeers(msg.peers.map((p) => ({id: p.id, alias: p.alias, state: peersRef.current[p.id]?.pc.connectionState === 'connected' ? 'connected' : 'new',})));
 
         msg.peers.forEach((p) => {
           peerMetaRef.current[p.id] = { alias: p.alias };
