@@ -2,4 +2,4 @@
 // public/robots.txt and public/sitemap.xml are static and repeat it; update those too.
 export const SITE_URL = 'https://ecoos3.duckdns.org';
 export const SITE_NAME = 'ecoos3';
-export const OG_IMAGE = `${SITE_URL}/og.png`;
+export const OG_IMAGE = `${SITE_URL}/logo.png`;
