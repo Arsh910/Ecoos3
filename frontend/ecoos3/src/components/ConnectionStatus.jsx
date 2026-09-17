@@ -22,7 +22,7 @@ function describe({ online, rejoinStalled, rejoinGaveUp, activeTransfer }) {
 
   if (rejoinGaveUp) {
     return {tone: 'err', icon: 'alert', label: 'Failed',
-      detail: `Couldn’t reach the server.${saved} Connect using a new room and resume.`,
+      detail: `Couldn’t reach the server.${saved} Leave and Connect using new or old room code (if peers still in it) and resume.`,
     };
   }
   if (!online) {
