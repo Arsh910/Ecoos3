@@ -9,6 +9,11 @@
   line-height: 1.6;
 }
 
+/* in-page links like "Find out more" glide instead of jumping; the app itself is unaffected */
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.site) { scroll-behavior: smooth; }
+}
+
 /* :where keeps this at zero weight, so link classes and .btn colours always win */
 :where(.site a) {
   color: inherit;

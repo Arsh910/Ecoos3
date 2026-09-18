@@ -20,7 +20,7 @@ export function SiteLayout({ title, description, path, children }) {
 
   // A new page should start at the top, as it would on a normal site.
   useEffect(() => {
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }, [pathname]);
 
   return (
