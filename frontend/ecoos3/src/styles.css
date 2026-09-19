@@ -224,8 +224,8 @@ textarea {
   border-radius: var(--r-md);
   display: flex;
   flex-direction: column;
-  min-height: 460px;
-  overflow: hidden;
+  height: 460px;
+  overflow: scroll;
 }
 
 .panel__head {
