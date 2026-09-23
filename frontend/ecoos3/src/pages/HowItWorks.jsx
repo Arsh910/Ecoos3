@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import { JsonLd } from '../components/JsonLd';
+import { HOW_IT_WORKS_ARTICLE } from '../lib/schema';
 import { SiteLayout } from './SiteLayout';
 
 // Two paths: setup messages go through the server, file data goes directly between browsers.
@@ -64,6 +66,8 @@ export function HowItWorks() {
       title="How ecoos3 works: direct browser-to-browser file transfer"
       description="What the signaling server sees, how two browsers connect through NAT, why some networks fail, and how chunked transfers resume after an interruption."
     >
+      <JsonLd data={HOW_IT_WORKS_ARTICLE} />
+
       <article className="prose">
         <h1>How ecoos3 works</h1>
         <p className="section__lead">

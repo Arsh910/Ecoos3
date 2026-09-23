@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import '@fontsource-variable/outfit';
 import { Seo } from '../components/Seo';
+import { JsonLd } from '../components/JsonLd';
+import { ORGANIZATION, WEB_SITE } from '../lib/schema';
 import logo from '../assets/site/logo.webp';
 import './pages.css';
 
@@ -15,7 +17,7 @@ function Brand() {
 }
 
 // Shared shell for the marketing pages: head tags, header, footer.
-export function SiteLayout({ title, description, path, children }) {
+export function SiteLayout({ title, description, path, noindex, children }) {
   const { pathname } = useLocation();
 
   // A new page should start at the top, as it would on a normal site.
@@ -25,7 +27,9 @@ export function SiteLayout({ title, description, path, children }) {
 
   return (
     <div className="site">
-      <Seo title={title} description={description} path={path} />
+      <Seo title={title} description={description} path={path} noindex={noindex} />
+      <JsonLd data={ORGANIZATION} />
+      <JsonLd data={WEB_SITE} />
 
       <header className="site__header">
         <Brand />

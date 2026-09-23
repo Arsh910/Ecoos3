@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Icon } from '../components/Icon';
+import { JsonLd } from '../components/JsonLd';
+import { SOFTWARE_APPLICATION } from '../lib/schema';
 import { SiteLayout } from './SiteLayout';
 import filesShot from '../assets/site/app-files.webp';
 import chatShot from '../assets/site/app-chat.webp';
@@ -74,10 +76,12 @@ export function Landing() {
       title="Send large files directly between computers | ecoos3"
       description="Send files of any size straight from one browser to another. No upload, no account — and interrupted transfers pick up where they stopped, even days later."
     >
+      <JsonLd data={SOFTWARE_APPLICATION} />
+
       <section className="hero">
         <div className="hero__text">
           <h1 className="hero__title">
-            Send huge files<span className="hero__star" aria-hidden="true">✦</span>
+            Send huge files<span className="hero__star" aria-hidden="true" />{' '}
             <br />
             without the upload
           </h1>

@@ -12,6 +12,7 @@ import { ResumePanel } from './components/ResumePanel';
 import { NatBanner } from './components/NatBanner';
 import { ConnectionStatus } from './components/ConnectionStatus';
 import { Icon } from './components/Icon';
+import { Seo } from './components/Seo';
 import { hasFSA } from './lib/capabilities';
 import logo from './assets/site/logo.webp';
 
@@ -72,6 +73,12 @@ function App() {
 
   return (
     <div className="app">
+      <Seo
+        title="Open ecoos3 — start a file transfer"
+        description="Create a room, share the code, and send files directly between browsers."
+        path="/app"
+        noindex
+      />
       <header className="header">
         <div>
           <h1 className="header__title">

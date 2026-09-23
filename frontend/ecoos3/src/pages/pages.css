@@ -151,6 +151,11 @@
   letter-spacing: -0.04em;
 }
 
+/* Drawn from CSS so the star stays out of the heading's text content. */
+.hero__star::before {
+  content: '\2726';
+}
+
 .hero__star {
   margin-left: 0.2em;
   font-size: 0.5em;
