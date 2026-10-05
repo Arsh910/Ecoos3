@@ -13,9 +13,7 @@
 [![Go](https://img.shields.io/badge/Go-1.27-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev/)
 [![Encrypted](https://img.shields.io/badge/Encrypted-DTLS-3ECF8E?style=flat-square&logo=letsencrypt&logoColor=white)](#privacy)
 
-<a href="ReadMe/demo.mp4"><img src="ReadMe/demo.jpg" alt="ecoos3 demo video: an 80 GB transfer that resumes the next morning. Click to play." width="900"></a>
-
-<sub>▶ Click to watch the 23-second demo</sub>
+<video src="ReadMe/demo.mp4" width="100%" controls></video>
 
 </div>
 
