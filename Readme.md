@@ -13,7 +13,7 @@
 [![Go](https://img.shields.io/badge/Go-1.27-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev/)
 [![Encrypted](https://img.shields.io/badge/Encrypted-DTLS-3ECF8E?style=flat-square&logo=letsencrypt&logoColor=white)](#privacy)
 
-<video src="https://ecoos3.duckdns.org/assets/demo-JIiQ4Yx9.mp4"></video>" width="100%" controls></video>
+<video src="https://ecoos3.duckdns.org/assets/demo-JIiQ4Yx9.mp4" width="100%" controls></video>
 
 </div>
 
