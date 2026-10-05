@@ -234,6 +234,13 @@
   text-align: center;
 }
 
+/* the demo video under the hero */
+.demo {
+  max-width: 1120px;
+  margin: 0 auto;
+  background: #000;
+}
+
 .muted {
   color: var(--text-faint);
   font-size: 14px;

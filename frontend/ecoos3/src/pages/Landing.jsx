@@ -7,6 +7,9 @@ import filesShot from '../assets/site/app-files.webp';
 import chatShot from '../assets/site/app-chat.webp';
 import resumeShot from '../assets/site/app-resume.webp';
 import roomShot from '../assets/site/app-room.webp';
+import demoVideo from '../assets/site/demo.mp4';
+import demoPoster from '../assets/site/demo-poster.webp';
+import demoCaptions from '../assets/site/demo.vtt?no-inline';
 
 const ADVANTAGES = [
   {
@@ -101,6 +104,17 @@ export function Landing() {
           <img className="shot shot--back" src={chatShot} alt="ecoos3 chat between two people during a transfer" width="420" height="484" />
           <img className="shot shot--front" src={filesShot} alt="ecoos3 receiving an 80 GB file, 62% complete" width="460" height="334" />
         </div>
+      </section>
+
+      <section id="demo" className="section">
+        <div className="section__center">
+          <h2 className="section__title">Watch 80 GB survive the night</h2>
+          <p className="section__lead">One transfer, start to finish: a room code, a dropped connection, and a resume the next morning.</p>
+        </div>
+        {/* preload="none": nothing downloads until someone presses play. */}
+        <video className="shot demo" src={demoVideo} poster={demoPoster} width="1920" height="1080" controls preload="none" playsInline>
+          <track kind="captions" src={demoCaptions} srcLang="en" label="English" />
+        </video>
       </section>
 
       <section id="more" className="section">
